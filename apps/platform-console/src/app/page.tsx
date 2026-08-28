@@ -267,6 +267,7 @@ export default function PlatformHome() {
                   <td>
                     <strong>{store.name}</strong>
                     <small>{store.slug}</small>
+                    <small>Store ID: {store.id}</small>
                   </td>
                   <td>
                     {store.posEnabled ? "POS " : ""}
