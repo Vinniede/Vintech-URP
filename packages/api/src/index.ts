@@ -249,9 +249,20 @@ app.post("/api/v1/platform/stores", zValidator("json", storeCreateSchema), async
     .where(eq(stores.slug, storeInput.slug))
     .limit(1);
   if (existing) return c.json({ error: "Store slug already exists" }, 409);
-  const [store] = await db.insert(stores).values(storeInput).returning({ id: stores.id, name: stores.name, slug: stores.slug, currency: stores.currency, posEnabled: stores.posEnabled, storefrontEnabled: stores.storefrontEnabled, timezone: stores.timezone });
+  let store;
+  try {
+    [store] = await db.insert(stores).values(storeInput).returning({ id: stores.id, name: stores.name, slug: stores.slug, currency: stores.currency, posEnabled: stores.posEnabled, storefrontEnabled: stores.storefrontEnabled, timezone: stores.timezone });
+  } catch {
+    return c.json({ error: "Store slug already exists" }, 409);
+  }
   if (!store) return c.json({ error: "Store could not be created" }, 500);
-  const [owner] = await db.insert(users).values({ storeId: store.id, name: ownerName, email: ownerEmail, phone: ownerPhone, role: "owner", passwordHash: await hashPassword(ownerPassword) }).returning({ id: users.id, name: users.name, email: users.email, role: users.role });
+  let owner;
+  try {
+    [owner] = await db.insert(users).values({ storeId: store.id, name: ownerName, email: ownerEmail, phone: ownerPhone, role: "owner", passwordHash: await hashPassword(ownerPassword) }).returning({ id: users.id, name: users.name, email: users.email, role: users.role });
+  } catch {
+    await db.delete(stores).where(eq(stores.id, store.id));
+    return c.json({ error: "Owner could not be created. Check that the owner email is not already in use." }, 409);
+  }
   return owner ? c.json({ store, owner }, 201) : c.json({ error: "Owner could not be created" }, 500);
 });
 

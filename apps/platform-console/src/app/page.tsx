@@ -135,6 +135,13 @@ export default function PlatformHome() {
         error?: unknown;
       } | null;
       if (!response.ok) {
+        if (response.status === 409) {
+          return setNotice(
+            typeof body?.error === "string"
+              ? body.error
+              : "That store link or owner email is already in use. Use a unique value and try again.",
+          );
+        }
         const error = body?.error;
         const message =
           typeof error === "string"
