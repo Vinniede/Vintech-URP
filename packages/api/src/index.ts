@@ -258,7 +258,7 @@ app.post("/api/v1/platform/stores", zValidator("json", storeCreateSchema), async
   if (!store) return c.json({ error: "Store could not be created" }, 500);
   let owner;
   try {
-    [owner] = await db.insert(users).values({ storeId: store.id, name: ownerName, email: ownerEmail, phone: ownerPhone, role: "owner", passwordHash: await hashPassword(ownerPassword) }).returning({ id: users.id, name: users.name, email: users.email, role: users.role });
+    [owner] = await db.insert(users).values({ storeId: store.id, name: ownerName, email: ownerEmail.trim().toLowerCase(), phone: ownerPhone, role: "owner", passwordHash: await hashPassword(ownerPassword) }).returning({ id: users.id, name: users.name, email: users.email, role: users.role });
   } catch {
     await db.delete(stores).where(eq(stores.id, store.id));
     return c.json({ error: "Owner could not be created. Check that the owner email is not already in use." }, 409);
@@ -335,7 +335,7 @@ app.post(
       .where(
         and(
           eq(users.storeId, input.storeId),
-          eq(users.email, input.email),
+          eq(users.email, input.email.trim().toLowerCase()),
           eq(users.isActive, true),
         ),
       )
