@@ -173,6 +173,14 @@ app.post("/api/v1/platform/billing/pricing", zValidator("json", planPricingSchem
   return pricing ? c.json({ pricing }, 201) : c.json({ error: "Pricing could not be created" }, 500);
 });
 
+app.delete("/api/v1/platform/billing/pricing/:id", async (c) => {
+  const [deleted] = await createDb(c.env.DATABASE_URL)
+    .delete(planPricing)
+    .where(eq(planPricing.id, c.req.param("id")))
+    .returning({ id: planPricing.id });
+  return deleted ? c.json({ deleted: deleted.id }) : c.json({ error: "Pricing not found" }, 404);
+});
+
 app.put("/api/v1/platform/billing/config", zValidator("json", platformPaymentConfigSchema), async (c) => {
   const input = c.req.valid("json");
   const db = createDb(c.env.DATABASE_URL);
