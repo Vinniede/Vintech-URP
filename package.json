@@ -1,0 +1,14 @@
+{
+  "name": "unified-retail-platform",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "build": "pnpm --recursive build",
+    "check": "pnpm --recursive typecheck",
+    "db:generate": "pnpm --filter @urp/db db:generate",
+    "db:migrate": "pnpm --filter @urp/db db:migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

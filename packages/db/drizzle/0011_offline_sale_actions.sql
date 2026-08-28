@@ -1,0 +1,2 @@
+ALTER TABLE pending_approvals ADD COLUMN device_action_id uuid;
+CREATE UNIQUE INDEX pending_approvals_store_device_action_idx ON pending_approvals (store_id, device_action_id) WHERE device_action_id IS NOT NULL;

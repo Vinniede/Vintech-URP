@@ -1,0 +1,355 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;600;700;800&display=swap");
+
+:root {
+  color: #183b3a;
+  background: #f3f0e8;
+  font-family: Manrope, sans-serif;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 85% 15%, #e8c27b 0 10%, transparent 30%), #f3f0e8;
+}
+.login-panel {
+  width: min(440px, 100%);
+  padding: 44px;
+  background: #fffdf8;
+  border: 1px solid #d7d1c3;
+  box-shadow: 12px 12px 0 #183b3a;
+}
+.login-panel h1,
+.topbar h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+.login-panel h1 {
+  font-size: clamp(2.2rem, 7vw, 4rem);
+  line-height: 0.98;
+  margin-bottom: 18px;
+}
+.cashier-login {
+  display: grid;
+  gap: 14px;
+}
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pin-keypad .urp-button {
+  min-height: 52px;
+  font-size: 1.1rem;
+}
+.cashier-login form .urp-input {
+  min-height: 48px;
+}
+.approval-banner {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 20;
+  padding: 14px 16px;
+  color: #fffdf8;
+  background: #183b3a;
+  box-shadow: 0 8px 24px #183b3a40;
+}
+.eyebrow {
+  margin: 0 0 10px;
+  color: #c45532;
+  font:
+    500 0.72rem "DM Mono",
+    monospace;
+  letter-spacing: 0.08em;
+}
+.muted {
+  color: #60716d;
+  line-height: 1.6;
+}
+form {
+  display: grid;
+  gap: 16px;
+  margin-top: 30px;
+}
+label {
+  display: grid;
+  gap: 7px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+input {
+  width: 100%;
+  border: 1px solid #bfc8be;
+  background: #f8f7f1;
+  color: #183b3a;
+  padding: 13px 14px;
+  outline: none;
+}
+input:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px #b8ded2;
+}
+.primary,
+.secondary,
+.quiet {
+  border: 0;
+  padding: 13px 16px;
+  font-weight: 800;
+}
+.primary {
+  color: #fffdf8;
+  background: #0f766e;
+}
+.primary:hover {
+  background: #095d57;
+}
+.primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.secondary {
+  color: #183b3a;
+  background: #e5e5d9;
+}
+.quiet {
+  padding: 7px 0;
+  color: #0f766e;
+  background: transparent;
+}
+.error {
+  color: #b13d27;
+  font-size: 0.84rem;
+}
+.pos-shell {
+  min-height: 100vh;
+  padding: 28px clamp(18px, 4vw, 60px);
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 38px;
+}
+.topbar h1 {
+  font-size: clamp(1.7rem, 4vw, 3.4rem);
+}
+.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #60716d;
+  font:
+    500 0.76rem "DM Mono",
+    monospace;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #c45532;
+}
+.dot.online {
+  background: #0f766e;
+}
+.pending {
+  padding-left: 12px;
+  border-left: 1px solid #c8c9bd;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 390px);
+  gap: 30px;
+  align-items: start;
+}
+.catalog,
+.cart {
+  min-width: 0;
+}
+.catalog-head,
+.cart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+.catalog-head h2,
+.cart-head h2 {
+  font-size: 1.5rem;
+}
+.search {
+  max-width: 320px;
+}
+.notice {
+  padding: 12px 14px;
+  color: #285f55;
+  background: #dceee4;
+  font-size: 0.83rem;
+}
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.product {
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: space-between;
+  text-align: left;
+  padding: 18px;
+  border: 1px solid #d5d0c3;
+  background: #fffdf8;
+  color: #183b3a;
+}
+.product:hover {
+  border-color: #0f766e;
+  transform: translateY(-2px);
+}
+.product-name {
+  font-weight: 800;
+}
+.product-meta,
+.cart-line small {
+  color: #72807a;
+  font:
+    0.7rem "DM Mono",
+    monospace;
+}
+.product strong {
+  color: #c45532;
+  font-size: 1.15rem;
+}
+.cart {
+  padding: 24px;
+  background: #183b3a;
+  color: #fffdf8;
+  min-height: 430px;
+}
+.cart .eyebrow {
+  color: #e8c27b;
+}
+.cart-head span {
+  color: #a6c4b9;
+  font:
+    0.7rem "DM Mono",
+    monospace;
+}
+.empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  color: #a6c4b9;
+  text-align: center;
+  border-top: 1px solid #39605b;
+  border-bottom: 1px solid #39605b;
+}
+.cart-lines {
+  display: grid;
+  gap: 16px;
+}
+.cart-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cart-line > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+.quantity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.quantity button {
+  width: 25px;
+  height: 25px;
+  border: 1px solid #66847c;
+  background: transparent;
+  color: #fffdf8;
+}
+.quantity span {
+  min-width: 16px;
+  text-align: center;
+}
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 34px;
+  padding-top: 18px;
+  border-top: 1px solid #66847c;
+  font-size: 1.2rem;
+}
+.payment-select {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #66847c;
+  color: #fffdf8;
+  background: #2b514c;
+}
+.checkout {
+  width: 100%;
+  margin-top: 18px;
+  background: #c45532;
+}
+.checkout:hover {
+  background: #a63f27;
+}
+.cart .secondary {
+  width: 100%;
+  margin-top: 10px;
+  background: #2b514c;
+  color: #fffdf8;
+}
+@media (max-width: 800px) {
+  .topbar,
+  .catalog-head {
+    align-items: start;
+    flex-direction: column;
+  }
+  .status {
+    flex-wrap: wrap;
+  }
+  .search {
+    max-width: none;
+  }
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .cart {
+    order: -1;
+  }
+}
+@media (max-width: 420px) {
+  .login-panel {
+    padding: 28px 22px;
+  }
+  .pos-shell {
+    padding: 20px 14px;
+  }
+}

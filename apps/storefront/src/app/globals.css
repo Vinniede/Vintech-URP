@@ -1,0 +1,247 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;600;700;800&display=swap");
+@import "@urp/ui/styles.css";
+:root {
+  --ink: #173b39;
+  --muted: #6f7b75;
+  --paper: #f4f1e9;
+  --panel: #fffdf8;
+  --teal: #0f766e;
+  --coral: #c45532;
+  --yellow: #e8c27b;
+  --line: #d7d1c3;
+  font-family: Manrope, sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--paper);
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+.store-shell {
+  min-height: 100vh;
+}
+.store-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px clamp(18px, 6vw, 90px);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.wordmark {
+  font:
+    500 0.72rem "DM Mono",
+    monospace;
+  letter-spacing: 0.08em;
+  color: var(--coral);
+}
+.store-header h1 {
+  margin: 3px 0 0;
+  font-size: 1.35rem;
+}
+.cart-button {
+  border: 0;
+  padding: 11px 14px;
+  color: white;
+  background: #0f766e;
+  font-weight: 800;
+}
+.cart-button:hover:not(:disabled) { background: #0b5f59; }
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.account-button {
+  border: 1px solid var(--line);
+  padding: 10px 13px;
+  color: var(--ink);
+  background: #fff7df;
+  font-weight: 800;
+}
+.account-button:hover:not(:disabled) { background: #f5df9f; }
+.store-main {
+  max-width: 1200px;
+  margin: auto;
+  padding: 54px clamp(18px, 6vw, 90px);
+}
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 42px;
+}
+.hero h2 {
+  max-width: 660px;
+  margin: 0;
+  font-size: clamp(2.2rem, 6vw, 5.4rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+.eyebrow {
+  margin: 0 0 12px;
+  color: var(--coral);
+  font:
+    500 0.72rem "DM Mono",
+    monospace;
+  letter-spacing: 0.08em;
+}
+.search {
+  width: min(320px, 100%);
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+.product-card {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.product-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.product-card p {
+  min-height: 42px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.price {
+  color: var(--coral);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.add {
+  border: 0;
+  padding: 11px;
+  color: white;
+  background: var(--teal);
+  font-weight: 800;
+}
+.cart-panel {
+  position: fixed;
+  z-index: 5;
+  inset: 0 0 0 auto;
+  width: min(420px, 100%);
+  padding: 30px;
+  overflow-y: auto;
+  background: var(--ink);
+  color: white;
+  box-shadow: -18px 0 40px #173b3940;
+}
+.cart-panel h2 {
+  margin-top: 0;
+}
+.close {
+  float: right;
+  border: 0;
+  color: white;
+  background: transparent;
+  font-size: 1.5rem;
+}
+.cart-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid #39605b;
+}
+.cart-line small {
+  display: block;
+  margin-top: 5px;
+  color: #a6c4b9;
+}
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  margin: 26px 0;
+  font-size: 1.25rem;
+}
+.checkout {
+  width: 100%;
+  border: 0;
+  padding: 14px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-weight: 800;
+}
+.fulfillment {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid #66847c;
+  color: white;
+  background: #2b514c;
+}
+.auth-backdrop {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #173b3990;
+}
+.auth-panel {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 13px;
+  padding: 30px;
+  background: var(--panel);
+  box-shadow: 12px 12px 0 var(--coral);
+}
+.auth-panel .close {
+  color: var(--ink);
+}
+.switch-auth {
+  border: 0;
+  color: var(--teal);
+  background: transparent;
+  font-weight: 800;
+}
+.state {
+  padding: 70px 0;
+  text-align: center;
+}
+.state h2 {
+  font-size: 2.5rem;
+}
+.muted {
+  color: var(--muted);
+}
+.error {
+  color: var(--coral);
+}
+@media (max-width: 700px) {
+  .store-header,
+  .hero {
+    align-items: start;
+    flex-direction: column;
+  }
+  .store-main {
+    padding-top: 34px;
+  }
+}

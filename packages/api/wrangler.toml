@@ -1,0 +1,10 @@
+name = "unified-retail-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-26"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+# Set DATABASE_URL and JWT_SECRET with `wrangler secret put` for deployed environments.
+# Set PAYMENT_CREDENTIALS_KEY with `wrangler secret put PAYMENT_CREDENTIALS_KEY`.

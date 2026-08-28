@@ -1,0 +1,30 @@
+{
+  "name": "@urp/api",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.4.3",
+    "@neondatabase/serverless": "^1.0.2",
+    "@urp/db": "workspace:*",
+    "@urp/shared-types": "workspace:*",
+    "drizzle-orm": "^0.44.5",
+    "hono": "^4.7.10",
+    "jose": "^6.0.10",
+    "zod": "^3.25.56"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250813.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.31.0"
+  }
+}

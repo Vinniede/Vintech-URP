@@ -1,0 +1,8 @@
+{
+  "name": "@urp/platform-console",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": { "dev": "next dev", "build": "next build", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@urp/ui": "workspace:*", "next": "^15.4.6", "react": "^19.1.1", "react-dom": "^19.1.1" },
+  "devDependencies": { "@types/node": "^22.15.21", "@types/react": "^19.1.10", "@types/react-dom": "^19.1.7", "typescript": "^5.8.3" }
+}
