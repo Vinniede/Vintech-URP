@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 jobs:
@@ -186,4 +188,42 @@ jobs:
             --branch=master \
             --commit-hash="${{ github.sha }}" \
             --commit-message="${{ github.event.head_commit.message }}" \
+            --commit-dirty=true
+
+  preview-pos:
+    name: Preview cashier POS
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build POS preview
+        env:
+          VITE_API_URL: https://unified-retail-api.vintech-urp.workers.dev
+        run: pnpm --filter @urp/cashier-pos build
+
+      - name: Deploy POS preview to Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx wrangler pages deploy apps/cashier-pos/dist \
+            --project-name=vintech-urp-pos \
+            --branch="pr-${{ github.event.pull_request.number }}" \
+            --commit-hash="${{ github.event.pull_request.head.sha }}" \
+            --commit-message="${{ github.event.pull_request.title }}" \
             --commit-dirty=true
