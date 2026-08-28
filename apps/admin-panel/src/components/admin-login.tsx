@@ -19,7 +19,7 @@ export function AdminLogin({
 }) {
   const [storeId, setStoreId] = useState("");
   const [email, setEmail] = useState("");
-  const [pin, setPin] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const submit = async (event: React.FormEvent) => {
@@ -30,7 +30,7 @@ export function AdminLogin({
       const response = await fetch(api("/auth/staff-login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId, email, pin }),
+        body: JSON.stringify({ storeId, email, password }),
       });
       if (!response.ok) throw new Error("Invalid credentials");
       const body = await response.json();
@@ -68,12 +68,11 @@ export function AdminLogin({
             />
           </label>
           <label>
-            PIN
+            Password
             <Input
               type="password"
-              inputMode="numeric"
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
               required
             />
           </label>

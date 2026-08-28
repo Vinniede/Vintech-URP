@@ -285,7 +285,7 @@ export function AdminConsole() {
 function Login({ onLogin }: { onLogin: (session: Session) => void }) {
   const [storeId, setStoreId] = useState("");
   const [email, setEmail] = useState("");
-  const [pin, setPin] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   return (
     <main className="login-shell">
@@ -302,7 +302,7 @@ function Login({ onLogin }: { onLogin: (session: Session) => void }) {
               const response = await fetch(api("/auth/staff-login"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ storeId, email, pin }),
+                body: JSON.stringify({ storeId, email, password }),
               });
               if (!response.ok) throw new Error("Invalid credentials");
               const body = await response.json();
@@ -332,12 +332,11 @@ function Login({ onLogin }: { onLogin: (session: Session) => void }) {
             />
           </label>
           <label>
-            PIN
+            Password
             <input
               type="password"
-              inputMode="numeric"
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
               required
             />
           </label>
