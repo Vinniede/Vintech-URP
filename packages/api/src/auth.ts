@@ -119,7 +119,8 @@ export const requireActiveStore = createMiddleware<{ Bindings: Env; Variables: A
     .where(eq(stores.id, user.storeId))
     .limit(1);
 
-  if (store?.isSuspended) {
+  // Allow owners and store_admin to access suspended stores to manage them
+  if (store?.isSuspended && !['owner', 'store_admin'].includes(user.role)) {
     return c.json({ error: 'Store suspended', code: 'store_suspended' }, 403);
   }
 
