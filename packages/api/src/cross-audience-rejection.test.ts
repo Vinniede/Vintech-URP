@@ -68,6 +68,33 @@ describe('cross-audience JWT rejection', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'Platform admin authentication required' });
   });
 
+  it('allows an owner to view pending approvals for the dashboard', async () => {
+    const fakeDb = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [{ isSuspended: false }],
+            orderBy: async () => [],
+          }),
+        }),
+      }),
+    } as any;
+
+    vi.spyOn(dbModule, 'createDb').mockReturnValue(fakeDb);
+
+    const token = await createToken({ id: 'owner-1', storeId: 'store-1', role: 'owner' }, 'test-secret');
+    const response = await app.request('http://localhost/api/v1/approvals/pending', {
+      headers: { Authorization: `Bearer ${token}` },
+    }, {
+      DATABASE_URL: 'postgres://test',
+      JWT_SECRET: 'test-secret',
+      PAYMENT_CREDENTIALS_KEY: 'test-key',
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ approvals: [] });
+  });
+
   it('rejects a suspended store even for an already-issued staff token', async () => {
     const suspendedApp = new Hono();
     suspendedApp.use('/api/v1/*', async (c, next) => {

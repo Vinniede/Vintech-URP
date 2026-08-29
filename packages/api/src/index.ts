@@ -3281,7 +3281,7 @@ app.post(
 
 app.get(
   "/api/v1/approvals/pending",
-  requireRole("supervisor", "store_admin"),
+  requireRole("supervisor", "store_admin", "owner"),
   async (c) => {
     const rows = await c
       .get("db")
@@ -3300,7 +3300,7 @@ app.get(
 
 app.post(
   "/api/v1/approvals/:id/decide",
-  requireRole("supervisor", "store_admin"),
+  requireRole("supervisor", "store_admin", "owner"),
   zValidator("json", approvalDecisionSchema),
   async (c) => {
     const user = c.get("user");

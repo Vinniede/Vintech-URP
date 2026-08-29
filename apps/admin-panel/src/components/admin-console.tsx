@@ -117,7 +117,12 @@ export function AdminConsole() {
         await Promise.all([
           request("/products"),
           request(`/reports/daily-summary?date=${date}`),
-          request("/approvals/pending"),
+          request("/approvals/pending").catch((error) => {
+            if (error instanceof Error && error.message.includes("403")) {
+              return { approvals: [] };
+            }
+            throw error;
+          }),
           request("/shifts"),
           request("/orders"),
         ]);
