@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@urp/scanning": "workspace:*",
     "@urp/shared-types": "workspace:*",
     "@urp/ui": "workspace:*",
     "dexie": "^4.0.11",

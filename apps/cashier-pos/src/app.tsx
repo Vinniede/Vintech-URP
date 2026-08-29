@@ -7,13 +7,20 @@ import {
   type Session,
 } from "./db";
 import { calculatePromotionPricing, sumPricedLines } from "@urp/shared-types";
-import { queueSale, syncPendingActions, syncPendingSales, syncPromotions } from "./sync";
+import {
+  queueSale,
+  syncPendingActions,
+  syncPendingSales,
+  syncPromotions,
+} from "./sync";
 import { generateReceiptCommands } from "@urp/shared-types";
 import { printWithFallback, type PrinterProfile } from "./printer";
 import { Button, Select, StatusPulse } from "@urp/ui";
 import { CashierLogin } from "./login";
 import { SupervisorApprovalModal } from "./supervisor-approval-modal";
 import { SaleHistory } from "./sale-history";
+import { parseQuantityInput } from "./cart-utils";
+import { useCameraScan, useKeyboardWedgeScan } from "@urp/scanning";
 
 const apiUrl = (path: string) =>
   `${import.meta.env.VITE_API_URL ?? ""}/api/v1${path}`;
@@ -59,6 +66,9 @@ export function App() {
   const [customerAccountId, setCustomerAccountId] = useState("");
   const [approvalIds, setApprovalIds] = useState<string[]>([]);
   const [view, setView] = useState<"sell" | "history">("sell");
+  const [pendingQuantityProduct, setPendingQuantityProduct] =
+    useState<CachedProduct | null>(null);
+  const [pendingQuantityValue, setPendingQuantityValue] = useState("1");
 
   const refreshPendingCount = async () =>
     setPendingCount(await posDb.pendingSales.count());
@@ -108,7 +118,8 @@ export function App() {
       try {
         const syncResult = await syncPendingSales(session);
         const actionResult = await syncPendingActions(session);
-        if (actionResult.approvalIds.length) setApprovalIds(actionResult.approvalIds);
+        if (actionResult.approvalIds.length)
+          setApprovalIds(actionResult.approvalIds);
         if (syncResult.approvalIds.length || actionResult.approvalIds.length)
           setApprovalIds(syncResult.approvalIds);
         if (syncResult.approvalIds.length)
@@ -210,17 +221,80 @@ export function App() {
     }
   };
 
-  const addToCart = (product: CachedProduct) =>
+  const addToCart = (product: CachedProduct, quantity = 1) => {
+    const finalQuantity =
+      Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
     setCart((current) => {
       const existing = current.find((line) => line.product.id === product.id);
       if (existing)
         return current.map((line) =>
           line.product.id === product.id
-            ? { ...line, quantity: line.quantity + 1 }
+            ? {
+                ...line,
+                quantity: Number((line.quantity + finalQuantity).toFixed(3)),
+              }
             : line,
         );
-      return [...current, { product, quantity: 1 }];
+      return [
+        ...current,
+        { product, quantity: Number(finalQuantity.toFixed(3)) },
+      ];
     });
+  };
+
+  const handleBarcodeScan = (barcode: string) => {
+    const normalized = barcode.trim();
+    if (!normalized) return;
+
+    const match = products.find((product) => {
+      const sku = product.sku.trim().toLowerCase();
+      const code = (product.barcode ?? "").trim().toLowerCase();
+      return sku === normalized.toLowerCase() || code === normalized.toLowerCase();
+    });
+
+    if (!match) {
+      setNotice(`No product matches barcode or SKU “${normalized}”.`);
+      return;
+    }
+
+    setQuery("");
+    openQuantityPrompt(match);
+  };
+
+  useKeyboardWedgeScan((barcode) => {
+    handleBarcodeScan(barcode);
+  });
+
+  const cameraScan = useCameraScan((barcode) => {
+    handleBarcodeScan(barcode);
+  });
+
+  const openQuantityPrompt = (product: CachedProduct) => {
+    const isWeighted =
+      product.unitOfMeasure === "kg" || product.unitOfMeasure === "litre";
+    if (!isWeighted) {
+      addToCart(product, 1);
+      return;
+    }
+
+    setPendingQuantityProduct(product);
+    setPendingQuantityValue("1");
+  };
+
+  const confirmWeightedQuantity = () => {
+    if (!pendingQuantityProduct) return;
+    const parsed = parseQuantityInput(
+      pendingQuantityValue,
+      pendingQuantityProduct.unitOfMeasure,
+    );
+    if (parsed === null) {
+      setNotice("Enter a valid quantity greater than zero.");
+      return;
+    }
+    addToCart(pendingQuantityProduct, parsed);
+    setPendingQuantityProduct(null);
+    setPendingQuantityValue("1");
+  };
 
   const checkout = async () => {
     if (
@@ -303,8 +377,7 @@ export function App() {
     if (online)
       void syncPendingSales(session)
         .then((result) => {
-          if (result.approvalIds.length)
-            setApprovalIds(result.approvalIds);
+          if (result.approvalIds.length) setApprovalIds(result.approvalIds);
           if (result.approvalIds.length)
             setNotice(
               "Credit sale needs supervisor approval. It remains queued until approved.",
@@ -369,205 +442,307 @@ export function App() {
 
   return (
     <>
-    <main className="pos-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">CASHIER TERMINAL</p>
-          <h1>Good shift, {session.name.split(" ")[0]}.</h1>
-        </div>
-        <div className="status">
-          <StatusPulse online={online} />
-          <span className="pending">{pendingCount} pending</span>
-          <Button
-            variant="secondary"
-            className="quiet"
-            onClick={() => {
-              void posDb.session.delete("active");
-              setSession(null);
-            }}
-          >
-            Sign out
-          </Button>
-        </div>
-      </header>
-      <nav className="pos-nav" aria-label="Cashier views"><Button variant={view === "sell" ? "primary" : "secondary"} onClick={() => setView("sell")}>Sell</Button><Button variant={view === "history" ? "primary" : "secondary"} onClick={() => setView("history")}>Sale history</Button></nav>
-      {view === "history" && <SaleHistory session={session} {...(shift ? { shiftId: shift.id } : {})} online={online} onNotice={setNotice} />}
-      {view === "sell" && <>
-      {!shift ? (
-        <section className="shift-banner">
+      <main className="pos-shell">
+        <header className="topbar">
           <div>
-            <p className="eyebrow">START OF SHIFT</p>
-            <h2>Open the till to sell.</h2>
+            <p className="eyebrow">CASHIER TERMINAL</p>
+            <h1>Good shift, {session.name.split(" ")[0]}.</h1>
           </div>
-          <input
-            aria-label="Opening float"
-            value={openingFloat}
-            onChange={(event) => setOpeningFloat(event.target.value)}
-          />
-          <Button variant="confirm" onClick={() => void openShift()}>
-            Open shift
+          <div className="status">
+            <StatusPulse online={online} />
+            <span className="pending">{pendingCount} pending</span>
+            <Button
+              variant="secondary"
+              className="quiet"
+              onClick={() => {
+                void posDb.session.delete("active");
+                setSession(null);
+              }}
+            >
+              Sign out
+            </Button>
+          </div>
+        </header>
+        <nav className="pos-nav" aria-label="Cashier views">
+          <Button
+            variant={view === "sell" ? "primary" : "secondary"}
+            onClick={() => setView("sell")}
+          >
+            Sell
           </Button>
-        </section>
-      ) : (
-        <p className="shift-active">
-          Shift active · opening float ${shift.openingFloat}
-        </p>
-      )}
-      <div className="workspace">
-        <section className="catalog">
-          <div className="catalog-head">
-            <div>
-              <p className="eyebrow">CATALOG</p>
-              <h2>Choose products</h2>
-            </div>
-            <input
-              className="search"
-              placeholder="Search SKU, barcode, or name"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-          {notice && <p className="notice">{notice}</p>}
-          <div className="product-grid">
-            {visibleProducts.map((product) => (
-              <button
-                className="product"
-                key={product.id}
-                disabled={!shift}
-                onClick={() => addToCart(product)}
-              >
-                <span className="product-name">{product.name}</span>
-                <span className="product-meta">
-                  {product.sku} · {product.stockQuantity} in stock
-                </span>
-                <strong>${product.sellingPrice}</strong>
-              </button>
-            ))}
-          </div>
-        </section>
-        <aside className="cart">
-          <div className="cart-head">
-            <div>
-              <p className="eyebrow">CURRENT SALE</p>
-              <h2>Cart</h2>
-            </div>
-            <span>{cart.length} lines</span>
-          </div>
-          {cart.length === 0 ? (
-            <div className="empty">Tap a product to start a sale.</div>
-          ) : (
-            <div className="cart-lines">
-              {cart.map((line) => (
-                <div className="cart-line" key={line.product.id}>
+          <Button
+            variant={view === "history" ? "primary" : "secondary"}
+            onClick={() => setView("history")}
+          >
+            Sale history
+          </Button>
+        </nav>
+        {view === "history" && (
+          <SaleHistory
+            session={session}
+            {...(shift ? { shiftId: shift.id } : {})}
+            online={online}
+            onNotice={setNotice}
+          />
+        )}
+        {view === "sell" && (
+          <>
+            {!shift ? (
+              <section className="shift-banner">
+                <div>
+                  <p className="eyebrow">START OF SHIFT</p>
+                  <h2>Open the till to sell.</h2>
+                </div>
+                <input
+                  aria-label="Opening float"
+                  value={openingFloat}
+                  onChange={(event) => setOpeningFloat(event.target.value)}
+                />
+                <Button variant="confirm" onClick={() => void openShift()}>
+                  Open shift
+                </Button>
+              </section>
+            ) : (
+              <p className="shift-active">
+                Shift active · opening float ${shift.openingFloat}
+              </p>
+            )}
+            <div className="workspace">
+              <section className="catalog">
+                <div className="catalog-head">
                   <div>
-                    <strong>{line.product.name}</strong>
-                    <small>${line.product.sellingPrice} each</small>
+                    <p className="eyebrow">CATALOG</p>
+                    <h2>Choose products</h2>
                   </div>
-                  <div className="quantity">
-                    <button
-                      onClick={() =>
-                        setCart((current) =>
-                          current.flatMap((item) =>
-                            item.product.id !== line.product.id
-                              ? [item]
-                              : item.quantity > 1
-                                ? [{ ...item, quantity: item.quantity - 1 }]
-                                : [],
-                          ),
-                        )
-                      }
+                  <div className="search-row">
+                    <input
+                      className="search"
+                      placeholder="Search SKU, barcode, or name"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                    />
+                    <Button
+                      variant={cameraScan.active ? "secondary" : "primary"}
+                      onClick={() => {
+                        if (cameraScan.active) {
+                          void cameraScan.stop();
+                          return;
+                        }
+                        void cameraScan.start();
+                      }}
                     >
-                      −
-                    </button>
-                    <span>{line.quantity}</span>
-                    <button onClick={() => addToCart(line.product)}>+</button>
+                      {cameraScan.active ? "Stop camera" : "Scan camera"}
+                    </Button>
                   </div>
                 </div>
-              ))}
+                {cameraScan.error && <p className="notice">{cameraScan.error}</p>}
+                {notice && <p className="notice">{notice}</p>}
+                {pendingQuantityProduct && (
+                  <div className="quantity-prompt">
+                    <div>
+                      <p className="eyebrow">WEIGHED ITEM</p>
+                      <h3>{pendingQuantityProduct.name}</h3>
+                    </div>
+                    <input
+                      aria-label="Enter quantity"
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={pendingQuantityValue}
+                      onChange={(event) =>
+                        setPendingQuantityValue(event.target.value)
+                      }
+                    />
+                    <div className="quantity-actions">
+                      <Button
+                        variant="secondary"
+                        onClick={() => setPendingQuantityProduct(null)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="confirm"
+                        onClick={confirmWeightedQuantity}
+                      >
+                        Add to cart
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <div className="product-grid">
+                  {visibleProducts.map((product) => (
+                    <button
+                      className="product"
+                      key={product.id}
+                      disabled={!shift}
+                      onClick={() => openQuantityPrompt(product)}
+                    >
+                      <span className="product-name">{product.name}</span>
+                      <span className="product-meta">
+                        {product.sku} · {product.stockQuantity} in stock
+                      </span>
+                      <strong>${product.sellingPrice}</strong>
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <aside className="cart">
+                <div className="cart-head">
+                  <div>
+                    <p className="eyebrow">CURRENT SALE</p>
+                    <h2>Cart</h2>
+                  </div>
+                  <span>{cart.length} lines</span>
+                </div>
+                {cart.length === 0 ? (
+                  <div className="empty">Tap a product to start a sale.</div>
+                ) : (
+                  <div className="cart-lines">
+                    {cart.map((line) => (
+                      <div className="cart-line" key={line.product.id}>
+                        <div>
+                          <strong>{line.product.name}</strong>
+                          <small>${line.product.sellingPrice} each</small>
+                        </div>
+                        <div className="quantity">
+                          <button
+                            onClick={() =>
+                              setCart((current) =>
+                                current.flatMap((item) =>
+                                  item.product.id !== line.product.id
+                                    ? [item]
+                                    : item.quantity > 1
+                                      ? [
+                                          {
+                                            ...item,
+                                            quantity: item.quantity - 1,
+                                          },
+                                        ]
+                                      : [],
+                                ),
+                              )
+                            }
+                          >
+                            −
+                          </button>
+                          <span>{line.quantity}</span>
+                          <button
+                            onClick={() => openQuantityPrompt(line.product)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="cart-total">
+                  <span>Total</span>
+                  <strong>${money(total)}</strong>
+                </div>
+                <Select
+                  className="payment-select"
+                  value={paymentMethod}
+                  onChange={(event) =>
+                    setPaymentMethod(
+                      event.target.value as PendingSale["paymentMethod"],
+                    )
+                  }
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="mobile_money">Mobile money</option>
+                  <option value="split">Split</option>
+                  <option value="credit">Charge to account</option>
+                </Select>
+                {paymentMethod === "credit" && (
+                  <Select
+                    className="payment-select"
+                    value={customerAccountId}
+                    onChange={(event) =>
+                      setCustomerAccountId(event.target.value)
+                    }
+                    disabled={!online}
+                  >
+                    <option value="">
+                      {online
+                        ? "Select customer account"
+                        : "Credit requires connection"}
+                    </option>
+                    {customerAccounts.map((account) => (
+                      <option value={account.id} key={account.id}>
+                        {account.name} · ${account.balance} / $
+                        {account.creditLimit}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+                <Select
+                  className="payment-select"
+                  value={printerProfileId}
+                  onChange={(event) => {
+                    setPrinterProfileId(event.target.value);
+                    localStorage.setItem(
+                      "urp-printer-profile",
+                      event.target.value,
+                    );
+                  }}
+                >
+                  <option value="">Browser receipt fallback</option>
+                  {printerProfiles.map((profile) => (
+                    <option value={profile.id} key={profile.id}>
+                      {profile.name} · {profile.transport}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  variant="confirm"
+                  className="checkout"
+                  disabled={
+                    cart.length === 0 ||
+                    !shift ||
+                    (paymentMethod === "credit" && !customerAccountId)
+                  }
+                  onClick={() => void checkout()}
+                >
+                  Complete sale
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setNotice(
+                      shift
+                        ? "Shift close will connect to /shifts/:id/close in the next UI pass."
+                        : "Open a shift before selling.",
+                    )
+                  }
+                >
+                  Manage shift
+                </Button>
+              </aside>
             </div>
-          )}
-          <div className="cart-total">
-            <span>Total</span>
-            <strong>${money(total)}</strong>
-          </div>
-          <Select
-            className="payment-select"
-            value={paymentMethod}
-            onChange={(event) =>
-              setPaymentMethod(
-                event.target.value as PendingSale["paymentMethod"],
-              )
-            }
-          >
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-            <option value="mobile_money">Mobile money</option>
-            <option value="split">Split</option>
-            <option value="credit">Charge to account</option>
-          </Select>
-          {paymentMethod === "credit" && (
-            <Select
-              className="payment-select"
-              value={customerAccountId}
-              onChange={(event) => setCustomerAccountId(event.target.value)}
-              disabled={!online}
-            >
-              <option value="">
-                {online
-                  ? "Select customer account"
-                  : "Credit requires connection"}
-              </option>
-              {customerAccounts.map((account) => (
-                <option value={account.id} key={account.id}>
-                  {account.name} · ${account.balance} / ${account.creditLimit}
-                </option>
-              ))}
-            </Select>
-          )}
-          <Select
-            className="payment-select"
-            value={printerProfileId}
-            onChange={(event) => {
-              setPrinterProfileId(event.target.value);
-              localStorage.setItem("urp-printer-profile", event.target.value);
-            }}
-          >
-            <option value="">Browser receipt fallback</option>
-            {printerProfiles.map((profile) => (
-              <option value={profile.id} key={profile.id}>
-                {profile.name} · {profile.transport}
-              </option>
-            ))}
-          </Select>
-          <Button
-            variant="confirm"
-            className="checkout"
-            disabled={
-              cart.length === 0 ||
-              !shift ||
-              (paymentMethod === "credit" && !customerAccountId)
-            }
-            onClick={() => void checkout()}
-          >
-            Complete sale
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() =>
-              setNotice(
-                shift
-                  ? "Shift close will connect to /shifts/:id/close in the next UI pass."
-                  : "Open a shift before selling.",
-              )
-            }
-          >
-            Manage shift
-          </Button>
-        </aside>
-      </div>
-      </>}
-    </main>
-    {approvalIds[0] && <SupervisorApprovalModal approval={{ id: approvalIds[0], actionType: "credit limit override", context: "A queued credit sale needs supervisor approval." }} apiUrl={apiUrl} accessToken={session.accessToken} onComplete={(approved) => { setApprovalIds((current) => current.slice(1)); setNotice(approved ? "Supervisor approved the queued sale." : "Supervisor did not approve the queued sale."); }} />}
+          </>
+        )}
+      </main>
+      {approvalIds[0] && (
+        <SupervisorApprovalModal
+          approval={{
+            id: approvalIds[0],
+            actionType: "credit limit override",
+            context: "A queued credit sale needs supervisor approval.",
+          }}
+          apiUrl={apiUrl}
+          accessToken={session.accessToken}
+          onComplete={(approved) => {
+            setApprovalIds((current) => current.slice(1));
+            setNotice(
+              approved
+                ? "Supervisor approved the queued sale."
+                : "Supervisor did not approve the queued sale.",
+            );
+          }}
+        />
+      )}
     </>
   );
 }

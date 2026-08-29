@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { productInputSchema } from "@urp/shared-types";
+import { useKeyboardWedgeScan } from "@urp/scanning";
 import {
   CustomerAccountsPanel,
   PromotionsPanel,
@@ -38,6 +39,7 @@ type Product = {
   id: string;
   name: string;
   sku: string;
+  barcode?: string | null;
   sellingPrice: string;
   stockQuantity: string;
   reorderLevel: string;
@@ -455,6 +457,25 @@ function Products({
   onRefresh: () => void;
 }) {
   const [editing, setEditing] = useState<Product | null>(null);
+  const [barcodeQuery, setBarcodeQuery] = useState("");
+
+  useKeyboardWedgeScan((barcode) => {
+    setBarcodeQuery(barcode);
+  });
+
+  const visibleProducts = useMemo(() => {
+    if (!barcodeQuery.trim()) return products;
+    const normalized = barcodeQuery.trim().toLowerCase();
+    return products.filter((product) => {
+      const barcodeValue = (product.barcode ?? "").trim().toLowerCase();
+      return (
+        product.sku.toLowerCase().includes(normalized) ||
+        product.name.toLowerCase().includes(normalized) ||
+        barcodeValue.includes(normalized)
+      );
+    });
+  }, [barcodeQuery, products]);
+
   return (
     <section className="section">
       <div className="section-head">
@@ -471,6 +492,14 @@ function Products({
           ? "Stock visibility only for inventory clerks."
           : "Product editing remains protected by the API role checks."}
       </p>
+      <label className="field">
+        Barcode / SKU search
+        <input
+          value={barcodeQuery}
+          onChange={(event) => setBarcodeQuery(event.target.value)}
+          placeholder="Scan a barcode or search by product"
+        />
+      </label>
       <div className="table-wrap">
         <table>
           <thead>
@@ -483,7 +512,7 @@ function Products({
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => (
+            {visibleProducts.map((product) => (
               <tr key={product.id}>
                 <td>{product.name}</td>
                 <td>{product.sku}</td>

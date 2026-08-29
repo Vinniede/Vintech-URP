@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@urp/scanning": "workspace:*",
     "@urp/shared-types": "workspace:*",
     "@urp/ui": "workspace:*",
     "next": "^15.4.6",

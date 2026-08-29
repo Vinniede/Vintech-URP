@@ -184,12 +184,23 @@ export default function PlatformHome() {
     await load(session.accessToken);
   };
   const deleteStore = async (store: Store) => {
-    if (!window.confirm(`Delete ${store.name} and all of its data? This cannot be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete ${store.name} and all of its data? This cannot be undone.`,
+      )
+    )
+      return;
     setDeletingStoreId(store.id);
     try {
-      const response = await fetch(api(`/stores/${store.id}`), { method: "DELETE", headers: { Authorization: `Bearer ${session.accessToken}` } });
-      const body = await response.json().catch(() => null) as { error?: string } | null;
-      if (!response.ok) return setNotice(body?.error ?? "Store could not be deleted.");
+      const response = await fetch(api(`/stores/${store.id}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      });
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!response.ok)
+        return setNotice(body?.error ?? "Store could not be deleted.");
       setInvoiceStore(null);
       setNotice("Store deleted.");
       await load(session.accessToken);
@@ -238,7 +249,14 @@ export default function PlatformHome() {
       </div>
       <PricingPanel session={session} />
       <PaymentConfigPanel session={session} />
-      {invoiceStore && <InvoicePanel storeId={invoiceStore.id} storeName={invoiceStore.name} session={session} onClose={() => setInvoiceStore(null)} />}
+      {invoiceStore && (
+        <InvoicePanel
+          storeId={invoiceStore.id}
+          storeName={invoiceStore.name}
+          session={session}
+          onClose={() => setInvoiceStore(null)}
+        />
+      )}
       <div className="platform-grid">
         <Card>
           <div className="section-head">
@@ -305,10 +323,17 @@ export default function PlatformHome() {
                     >
                       {store.isSuspended ? "Reactivate" : "Suspend"}
                     </Button>
-                    <Button variant="secondary" onClick={() => setInvoiceStore(store)}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setInvoiceStore(store)}
+                    >
                       Invoices
                     </Button>
-                    <Button variant="danger" disabled={deletingStoreId === store.id} onClick={() => void deleteStore(store)}>
+                    <Button
+                      variant="danger"
+                      disabled={deletingStoreId === store.id}
+                      onClick={() => void deleteStore(store)}
+                    >
                       {deletingStoreId === store.id ? "Deleting..." : "Delete"}
                     </Button>
                   </td>
@@ -330,11 +355,16 @@ export default function PlatformHome() {
             </label>
             <label>
               Store link
-              <Input name="slug" placeholder="corner-market or Corner Market" required />
+              <Input
+                name="slug"
+                placeholder="corner-market or Corner Market"
+                required
+              />
             </label>
             <label>
               Currency
-              <select className="platform-select"
+              <select
+                className="platform-select"
                 name="currency"
                 defaultValue="KES"
                 required
@@ -348,7 +378,12 @@ export default function PlatformHome() {
             </label>
             <label>
               Timezone
-              <select className="platform-select" name="timezone" defaultValue="Africa/Nairobi" required>
+              <select
+                className="platform-select"
+                name="timezone"
+                defaultValue="Africa/Nairobi"
+                required
+              >
                 {timezones.map((timezone) => (
                   <option key={timezone} value={timezone}>
                     {timezone.replaceAll("_", " ")}
@@ -371,7 +406,12 @@ export default function PlatformHome() {
             </label>
             <label>
               Temporary password
-              <Input name="ownerPassword" type="password" minLength={8} required />
+              <Input
+                name="ownerPassword"
+                type="password"
+                minLength={8}
+                required
+              />
             </label>
             <label className="check">
               <input type="checkbox" name="posEnabled" /> Enable POS

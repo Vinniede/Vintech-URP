@@ -108,34 +108,68 @@ import {
 } from "./payment-crypto.js";
 import type { AppEnv } from "./types.js";
 import { hashPassword, verifyPassword } from "./passwords.js";
-import { bootstrapPlatformAdmin, createPlatformToken, requirePlatformAdmin } from "./platform-auth.js";
-import { completeInvoicePayment, generateInvoices, markOverdueInvoices } from "./billing.js";
-import { moduleToggleSchema, platformAdminLoginSchema, storeCreateSchema } from "@urp/shared-types";
+import {
+  bootstrapPlatformAdmin,
+  createPlatformToken,
+  requirePlatformAdmin,
+} from "./platform-auth.js";
+import {
+  completeInvoicePayment,
+  generateInvoices,
+  markOverdueInvoices,
+} from "./billing.js";
+import {
+  moduleToggleSchema,
+  platformAdminLoginSchema,
+  storeCreateSchema,
+} from "@urp/shared-types";
 import { platformAdmins } from "@urp/db/schema";
 
 const app = new Hono<AppEnv>();
 
-app.use("/api/*", cors({
-  origin: (origin) => origin,
-  allowHeaders: ["Content-Type", "Authorization"],
-  allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-  maxAge: 86400,
-}));
+app.use(
+  "/api/*",
+  cors({
+    origin: (origin) => origin,
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    maxAge: 86400,
+  }),
+);
 
-app.post("/api/v1/platform/auth/login", zValidator("json", platformAdminLoginSchema), async (c) => {
-  const input = c.req.valid("json");
-  const db = createDb(c.env.DATABASE_URL);
-  const defaultEmail = (c.env.PLATFORM_ADMIN_EMAIL ?? "system@urp.local").trim().toLowerCase();
-  const normalizedEmail = input.email.trim().toLowerCase();
+app.post(
+  "/api/v1/platform/auth/login",
+  zValidator("json", platformAdminLoginSchema),
+  async (c) => {
+    const input = c.req.valid("json");
+    const db = createDb(c.env.DATABASE_URL);
+    const defaultEmail = (c.env.PLATFORM_ADMIN_EMAIL ?? "system@urp.local")
+      .trim()
+      .toLowerCase();
+    const normalizedEmail = input.email.trim().toLowerCase();
 
-  if (!normalizedEmail || normalizedEmail === defaultEmail) {
-    await bootstrapPlatformAdmin(db, c.env, normalizedEmail || defaultEmail);
-  }
+    if (!normalizedEmail || normalizedEmail === defaultEmail) {
+      await bootstrapPlatformAdmin(db, c.env, normalizedEmail || defaultEmail);
+    }
 
-  const [admin] = await db.select().from(platformAdmins).where(and(eq(platformAdmins.email, normalizedEmail), eq(platformAdmins.isActive, true))).limit(1);
-  if (!admin || !(await verifyPassword(input.password, admin.passwordHash))) return c.json({ error: "Invalid credentials" }, 401);
-  return c.json({ accessToken: await createPlatformToken(admin.id, c.env.JWT_SECRET), admin: { id: admin.id, name: admin.name, email: admin.email } });
-});
+    const [admin] = await db
+      .select()
+      .from(platformAdmins)
+      .where(
+        and(
+          eq(platformAdmins.email, normalizedEmail),
+          eq(platformAdmins.isActive, true),
+        ),
+      )
+      .limit(1);
+    if (!admin || !(await verifyPassword(input.password, admin.passwordHash)))
+      return c.json({ error: "Invalid credentials" }, 401);
+    return c.json({
+      accessToken: await createPlatformToken(admin.id, c.env.JWT_SECRET),
+      admin: { id: admin.id, name: admin.name, email: admin.email },
+    });
+  },
+);
 
 app.use("/api/v1/platform/*", requirePlatformAdmin);
 app.use("/api/v1/platform/*", async (c, next) => {
@@ -144,7 +178,21 @@ app.use("/api/v1/platform/*", async (c, next) => {
 });
 app.get("/api/v1/platform/stores", async (c) => {
   const db = createDb(c.env.DATABASE_URL);
-  return c.json({ stores: await db.select({ id: stores.id, name: stores.name, slug: stores.slug, currency: stores.currency, posEnabled: stores.posEnabled, storefrontEnabled: stores.storefrontEnabled, timezone: stores.timezone, createdAt: stores.createdAt }).from(stores).orderBy(desc(stores.createdAt)) });
+  return c.json({
+    stores: await db
+      .select({
+        id: stores.id,
+        name: stores.name,
+        slug: stores.slug,
+        currency: stores.currency,
+        posEnabled: stores.posEnabled,
+        storefrontEnabled: stores.storefrontEnabled,
+        timezone: stores.timezone,
+        createdAt: stores.createdAt,
+      })
+      .from(stores)
+      .orderBy(desc(stores.createdAt)),
+  });
 });
 
 app.get("/api/v1/platform/stores/:id/invoices", async (c) => {
@@ -158,49 +206,99 @@ app.get("/api/v1/platform/stores/:id/invoices", async (c) => {
 
 app.get("/api/v1/platform/billing/config", async (c) => {
   const rows = await createDb(c.env.DATABASE_URL)
-    .select({ provider: platformPaymentConfig.provider, environment: platformPaymentConfig.environment, isActive: platformPaymentConfig.isActive, credentialsEncrypted: platformPaymentConfig.credentialsEncrypted })
+    .select({
+      provider: platformPaymentConfig.provider,
+      environment: platformPaymentConfig.environment,
+      isActive: platformPaymentConfig.isActive,
+      credentialsEncrypted: platformPaymentConfig.credentialsEncrypted,
+    })
     .from(platformPaymentConfig);
-  return c.json({ paymentConfigs: rows.map(({ credentialsEncrypted, ...config }) => ({ ...config, configured: Boolean(credentialsEncrypted) })) });
+  return c.json({
+    paymentConfigs: rows.map(({ credentialsEncrypted, ...config }) => ({
+      ...config,
+      configured: Boolean(credentialsEncrypted),
+    })),
+  });
 });
 
 app.get("/api/v1/platform/billing/pricing", async (c) => {
-  const rows = await createDb(c.env.DATABASE_URL).select().from(planPricing).orderBy(desc(planPricing.effectiveFrom));
+  const rows = await createDb(c.env.DATABASE_URL)
+    .select()
+    .from(planPricing)
+    .orderBy(desc(planPricing.effectiveFrom));
   return c.json({ pricing: rows });
 });
 
-app.post("/api/v1/platform/billing/pricing", zValidator("json", planPricingSchema), async (c) => {
-  const [pricing] = await createDb(c.env.DATABASE_URL).insert(planPricing).values(c.req.valid("json")).returning();
-  return pricing ? c.json({ pricing }, 201) : c.json({ error: "Pricing could not be created" }, 500);
-});
+app.post(
+  "/api/v1/platform/billing/pricing",
+  zValidator("json", planPricingSchema),
+  async (c) => {
+    const [pricing] = await createDb(c.env.DATABASE_URL)
+      .insert(planPricing)
+      .values(c.req.valid("json"))
+      .returning();
+    return pricing
+      ? c.json({ pricing }, 201)
+      : c.json({ error: "Pricing could not be created" }, 500);
+  },
+);
 
 app.delete("/api/v1/platform/billing/pricing/:id", async (c) => {
   const [deleted] = await createDb(c.env.DATABASE_URL)
     .delete(planPricing)
     .where(eq(planPricing.id, c.req.param("id")))
     .returning({ id: planPricing.id });
-  return deleted ? c.json({ deleted: deleted.id }) : c.json({ error: "Pricing not found" }, 404);
+  return deleted
+    ? c.json({ deleted: deleted.id })
+    : c.json({ error: "Pricing not found" }, 404);
 });
 
-app.put("/api/v1/platform/billing/config", zValidator("json", platformPaymentConfigSchema), async (c) => {
-  const input = c.req.valid("json");
-  const db = createDb(c.env.DATABASE_URL);
-  const encrypted = await encryptCredentials(JSON.stringify(input.credentials), c.env.PAYMENT_CREDENTIALS_KEY);
-  const [config] = await db
-    .insert(platformPaymentConfig)
-    .values({ provider: input.provider, environment: input.environment, isActive: input.isActive, credentialsEncrypted: encrypted })
-    .onConflictDoUpdate({ target: platformPaymentConfig.provider, set: { environment: input.environment, isActive: input.isActive, credentialsEncrypted: encrypted } })
-    .returning({ provider: platformPaymentConfig.provider, environment: platformPaymentConfig.environment, isActive: platformPaymentConfig.isActive });
-  return c.json({ paymentConfig: config });
-});
+app.put(
+  "/api/v1/platform/billing/config",
+  zValidator("json", platformPaymentConfigSchema),
+  async (c) => {
+    const input = c.req.valid("json");
+    const db = createDb(c.env.DATABASE_URL);
+    const encrypted = await encryptCredentials(
+      JSON.stringify(input.credentials),
+      c.env.PAYMENT_CREDENTIALS_KEY,
+    );
+    const [config] = await db
+      .insert(platformPaymentConfig)
+      .values({
+        provider: input.provider,
+        environment: input.environment,
+        isActive: input.isActive,
+        credentialsEncrypted: encrypted,
+      })
+      .onConflictDoUpdate({
+        target: platformPaymentConfig.provider,
+        set: {
+          environment: input.environment,
+          isActive: input.isActive,
+          credentialsEncrypted: encrypted,
+        },
+      })
+      .returning({
+        provider: platformPaymentConfig.provider,
+        environment: platformPaymentConfig.environment,
+        isActive: platformPaymentConfig.isActive,
+      });
+    return c.json({ paymentConfig: config });
+  },
+);
 
 app.delete("/api/v1/platform/billing/config/:provider", async (c) => {
   const provider = c.req.param("provider");
-  if (provider !== "mpesa" && provider !== "bank") return c.json({ error: "Unsupported payment provider" }, 400);
+  if (provider !== "mpesa" && provider !== "bank")
+    return c.json({ error: "Unsupported payment provider" }, 400);
   const [deleted] = await createDb(c.env.DATABASE_URL)
     .delete(platformPaymentConfig)
     .where(eq(platformPaymentConfig.provider, provider))
     .returning({ provider: platformPaymentConfig.provider });
-  return deleted ? c.json({ deleted: deleted.provider }) : c.json({ error: "Payment configuration not found" }, 404);
+  return deleted
+    ? c.json({ deleted: deleted.provider })
+    : c.json({ error: "Payment configuration not found" }, 404);
 });
 
 app.post(
@@ -217,17 +315,32 @@ app.post(
     const input = c.req.valid("json");
     const [invoice] = await db
       .insert(invoices)
-      .values({ storeId: c.req.param("id"), currency: store.currency, ...input })
+      .values({
+        storeId: c.req.param("id"),
+        currency: store.currency,
+        ...input,
+      })
       .returning();
-    return invoice ? c.json({ invoice }, 201) : c.json({ error: "Invoice could not be created" }, 500);
+    return invoice
+      ? c.json({ invoice }, 201)
+      : c.json({ error: "Invoice could not be created" }, 500);
   },
 );
 
 app.post("/api/v1/platform/invoices/:id/mark-paid", async (c) => {
   const db = createDb(c.env.DATABASE_URL);
-  const body = (await c.req.json().catch(() => ({}))) as { providerReference?: string };
-  const invoice = await completeInvoicePayment(db, c.req.param("id"), body.providerReference ?? null, { source: "platform-manual" });
-  return invoice ? c.json({ invoice: { ...invoice, status: "paid" } }) : c.json({ error: "Invoice not found" }, 404);
+  const body = (await c.req.json().catch(() => ({}))) as {
+    providerReference?: string;
+  };
+  const invoice = await completeInvoicePayment(
+    db,
+    c.req.param("id"),
+    body.providerReference ?? null,
+    { source: "platform-manual" },
+  );
+  return invoice
+    ? c.json({ invoice: { ...invoice, status: "paid" } })
+    : c.json({ error: "Invoice not found" }, 404);
 });
 
 app.post("/api/v1/platform/billing/mark-overdue", async (c) => {
@@ -240,41 +353,98 @@ app.post("/api/v1/platform/billing/generate", async (c) => {
   return c.json({ generated: count });
 });
 
-app.post("/api/v1/platform/stores", zValidator("json", storeCreateSchema), async (c) => {
-  const { ownerName, ownerEmail, ownerPhone, ownerPassword, ...storeInput } = c.req.valid("json");
-  const db = createDb(c.env.DATABASE_URL);
-  const [existing] = await db
-    .select({ id: stores.id })
-    .from(stores)
-    .where(eq(stores.slug, storeInput.slug))
-    .limit(1);
-  if (existing) return c.json({ error: "Store slug already exists" }, 409);
-  let store;
-  try {
-    [store] = await db.insert(stores).values(storeInput).returning({ id: stores.id, name: stores.name, slug: stores.slug, currency: stores.currency, posEnabled: stores.posEnabled, storefrontEnabled: stores.storefrontEnabled, timezone: stores.timezone });
-  } catch {
-    return c.json({ error: "Store slug already exists" }, 409);
-  }
-  if (!store) return c.json({ error: "Store could not be created" }, 500);
-  let owner;
-  try {
-    [owner] = await db.insert(users).values({ storeId: store.id, name: ownerName, email: ownerEmail.trim().toLowerCase(), phone: ownerPhone, role: "owner", passwordHash: await hashPassword(ownerPassword) }).returning({ id: users.id, name: users.name, email: users.email, role: users.role });
-  } catch {
-    await db.delete(stores).where(eq(stores.id, store.id));
-    return c.json({ error: "Owner could not be created. Check that the owner email is not already in use." }, 409);
-  }
-  return owner ? c.json({ store, owner }, 201) : c.json({ error: "Owner could not be created" }, 500);
-});
+app.post(
+  "/api/v1/platform/stores",
+  zValidator("json", storeCreateSchema),
+  async (c) => {
+    const { ownerName, ownerEmail, ownerPhone, ownerPassword, ...storeInput } =
+      c.req.valid("json");
+    const db = createDb(c.env.DATABASE_URL);
+    const [existing] = await db
+      .select({ id: stores.id })
+      .from(stores)
+      .where(eq(stores.slug, storeInput.slug))
+      .limit(1);
+    if (existing) return c.json({ error: "Store slug already exists" }, 409);
+    let store;
+    try {
+      [store] = await db
+        .insert(stores)
+        .values(storeInput)
+        .returning({
+          id: stores.id,
+          name: stores.name,
+          slug: stores.slug,
+          currency: stores.currency,
+          posEnabled: stores.posEnabled,
+          storefrontEnabled: stores.storefrontEnabled,
+          timezone: stores.timezone,
+        });
+    } catch {
+      return c.json({ error: "Store slug already exists" }, 409);
+    }
+    if (!store) return c.json({ error: "Store could not be created" }, 500);
+    let owner;
+    try {
+      [owner] = await db
+        .insert(users)
+        .values({
+          storeId: store.id,
+          name: ownerName,
+          email: ownerEmail.trim().toLowerCase(),
+          phone: ownerPhone,
+          role: "owner",
+          passwordHash: await hashPassword(ownerPassword),
+        })
+        .returning({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+        });
+    } catch {
+      await db.delete(stores).where(eq(stores.id, store.id));
+      return c.json(
+        {
+          error:
+            "Owner could not be created. Check that the owner email is not already in use.",
+        },
+        409,
+      );
+    }
+    return owner
+      ? c.json({ store, owner }, 201)
+      : c.json({ error: "Owner could not be created" }, 500);
+  },
+);
 
-app.patch("/api/v1/platform/stores/:id/modules", zValidator("json", moduleToggleSchema), async (c) => {
-  const [store] = await createDb(c.env.DATABASE_URL).update(stores).set(c.req.valid("json")).where(eq(stores.id, c.req.param("id"))).returning({ id: stores.id, posEnabled: stores.posEnabled, storefrontEnabled: stores.storefrontEnabled });
-  return store ? c.json({ store }) : c.json({ error: "Store not found" }, 404);
-});
+app.patch(
+  "/api/v1/platform/stores/:id/modules",
+  zValidator("json", moduleToggleSchema),
+  async (c) => {
+    const [store] = await createDb(c.env.DATABASE_URL)
+      .update(stores)
+      .set(c.req.valid("json"))
+      .where(eq(stores.id, c.req.param("id")))
+      .returning({
+        id: stores.id,
+        posEnabled: stores.posEnabled,
+        storefrontEnabled: stores.storefrontEnabled,
+      });
+    return store
+      ? c.json({ store })
+      : c.json({ error: "Store not found" }, 404);
+  },
+);
 
 app.delete("/api/v1/platform/stores/:id", async (c) => {
   const db = createDb(c.env.DATABASE_URL);
   const storeId = c.req.param("id");
-  const [store] = await db.select({ id: stores.id }).from(stores).where(eq(stores.id, storeId)).limit(1);
+  const [store] = await db
+    .select({ id: stores.id })
+    .from(stores)
+    .where(eq(stores.id, storeId))
+    .limit(1);
   if (!store) return c.json({ error: "Store not found" }, 404);
   const deleteStatements = [
     sql`DELETE FROM invoice_payment_attempts WHERE invoice_id IN (SELECT id FROM invoices WHERE store_id = ${storeId})`,
@@ -330,7 +500,7 @@ app.post(
     const input = c.req.valid("json");
     const db = createDb(c.env.DATABASE_URL);
     const [user] = await db
-        .select()
+      .select()
       .from(users)
       .where(
         and(
@@ -340,8 +510,13 @@ app.post(
         ),
       )
       .limit(1);
-    const [staffStore] = await db.select({ isSuspended: stores.isSuspended }).from(stores).where(eq(stores.id, input.storeId)).limit(1);
-    if (staffStore?.isSuspended) return c.json({ error: "Account suspended, contact support" }, 403);
+    const [staffStore] = await db
+      .select({ isSuspended: stores.isSuspended })
+      .from(stores)
+      .where(eq(stores.id, input.storeId))
+      .limit(1);
+    if (staffStore?.isSuspended)
+      return c.json({ error: "Account suspended, contact support" }, 403);
 
     if (!user) return c.json({ error: "Invalid credentials" }, 401);
     const credential = input.password ?? input.pin;
@@ -378,7 +553,7 @@ app.post(
     const input = c.req.valid("json");
     const db = createDb(c.env.DATABASE_URL);
     const [customer] = await db
-        .select()
+      .select()
       .from(customers)
       .where(
         and(
@@ -393,8 +568,13 @@ app.post(
     ) {
       return c.json({ error: "Invalid credentials" }, 401);
     }
-    const [customerStore] = await db.select({ isSuspended: stores.isSuspended }).from(stores).where(eq(stores.id, customer.storeId)).limit(1);
-    if (customerStore?.isSuspended) return c.json({ error: "Store temporarily unavailable" }, 403);
+    const [customerStore] = await db
+      .select({ isSuspended: stores.isSuspended })
+      .from(stores)
+      .where(eq(stores.id, customer.storeId))
+      .limit(1);
+    if (customerStore?.isSuspended)
+      return c.json({ error: "Store temporarily unavailable" }, 403);
 
     const identity = {
       id: customer.id,
@@ -578,11 +758,15 @@ app.get("/api/v1/storefront/:storeSlug/products/:id", async (c) => {
       ),
   });
 });
-  app.get('/api/v1/sales', requireRole('cashier', 'supervisor', 'store_admin', 'owner'), zValidator('query', salesListQuerySchema), async (c) => {
-    const user = c.get('user');
-    const query = c.req.valid('query');
+app.get(
+  "/api/v1/sales",
+  requireRole("cashier", "supervisor", "store_admin", "owner"),
+  zValidator("query", salesListQuerySchema),
+  async (c) => {
+    const user = c.get("user");
+    const query = c.req.valid("query");
     const conditions = [eq(sales.storeId, user.storeId)];
-    if (user.role === 'cashier') conditions.push(eq(sales.cashierId, user.id));
+    if (user.role === "cashier") conditions.push(eq(sales.cashierId, user.id));
     if (query.shiftId) conditions.push(eq(sales.shiftId, query.shiftId));
     if (query.date) {
       const start = new Date(`${query.date}T00:00:00.000Z`);
@@ -590,8 +774,26 @@ app.get("/api/v1/storefront/:storeSlug/products/:id", async (c) => {
       end.setUTCDate(end.getUTCDate() + 1);
       conditions.push(gte(sales.createdAt, start), lt(sales.createdAt, end));
     }
-    return c.json({ sales: await c.get('db').select({ id: sales.id, deviceSaleId: sales.deviceSaleId, cashierId: sales.cashierId, shiftId: sales.shiftId, totalAmount: sales.totalAmount, paymentMethod: sales.paymentMethod, status: sales.status, createdAt: sales.createdAt }).from(sales).where(and(...conditions)).orderBy(desc(sales.createdAt)).limit(100) });
-  });
+    return c.json({
+      sales: await c
+        .get("db")
+        .select({
+          id: sales.id,
+          deviceSaleId: sales.deviceSaleId,
+          cashierId: sales.cashierId,
+          shiftId: sales.shiftId,
+          totalAmount: sales.totalAmount,
+          paymentMethod: sales.paymentMethod,
+          status: sales.status,
+          createdAt: sales.createdAt,
+        })
+        .from(sales)
+        .where(and(...conditions))
+        .orderBy(desc(sales.createdAt))
+        .limit(100),
+    });
+  },
+);
 
 app.get("/api/v1/storefront/:storeSlug/categories", async (c) => {
   const db = createDb(c.env.DATABASE_URL);
@@ -905,15 +1107,12 @@ app.post("/api/v1/orders", zValidator("json", createOrderSchema), async (c) => {
         unitPrice: product.sellingPrice,
       })),
     );
-  await c
-    .get("db")
-    .insert(orderStatusHistory)
-    .values({
-      storeId: user.storeId,
-      orderId: order.id,
-      status: "pending",
-      note: "Order placed by customer",
-    });
+  await c.get("db").insert(orderStatusHistory).values({
+    storeId: user.storeId,
+    orderId: order.id,
+    status: "pending",
+    note: "Order placed by customer",
+  });
   return c.json({ order }, 201);
 });
 
@@ -1017,15 +1216,12 @@ app.post(
       })
       .where(and(eq(orders.id, order.id), eq(orders.storeId, order.storeId)))
       .returning();
-    await c
-      .get("db")
-      .insert(orderStatusHistory)
-      .values({
-        storeId: order.storeId,
-        orderId: order.id,
-        status: "paid",
-        note: "Payment confirmed",
-      });
+    await c.get("db").insert(orderStatusHistory).values({
+      storeId: order.storeId,
+      orderId: order.id,
+      status: "paid",
+      note: "Payment confirmed",
+    });
     return c.json({ order: updated });
   },
 );
@@ -1079,16 +1275,13 @@ app.patch(
       .set({ status: input.status, updatedAt: new Date() })
       .where(eq(orders.id, order.id))
       .returning();
-    await c
-      .get("db")
-      .insert(orderStatusHistory)
-      .values({
-        storeId: user.storeId,
-        orderId: order.id,
-        status: input.status,
-        changedByUserId: user.id,
-        note: input.note,
-      });
+    await c.get("db").insert(orderStatusHistory).values({
+      storeId: user.storeId,
+      orderId: order.id,
+      status: input.status,
+      changedByUserId: user.id,
+      note: input.note,
+    });
     return c.json({ order: updated });
   },
 );
@@ -1099,11 +1292,31 @@ app.post(
   async (c) => {
     const callback = c.req.valid("json").Body.stkCallback;
     const db = createDb(c.env.DATABASE_URL);
-    const [attempt] = await db.select().from(invoicePaymentAttempts).where(eq(invoicePaymentAttempts.providerReference, callback.CheckoutRequestID)).limit(1);
+    const [attempt] = await db
+      .select()
+      .from(invoicePaymentAttempts)
+      .where(
+        eq(
+          invoicePaymentAttempts.providerReference,
+          callback.CheckoutRequestID,
+        ),
+      )
+      .limit(1);
     if (!attempt) return c.json({ ResultCode: 0, ResultDesc: "Accepted" });
-    if (attempt.status !== "initiated") return c.json({ ResultCode: 0, ResultDesc: "Already processed" });
-    if (callback.ResultCode === 0) await completeInvoicePayment(db, attempt.invoiceId, callback.CheckoutRequestID, callback);
-    else await db.update(invoicePaymentAttempts).set({ status: "failed", rawCallbackPayload: callback }).where(eq(invoicePaymentAttempts.id, attempt.id));
+    if (attempt.status !== "initiated")
+      return c.json({ ResultCode: 0, ResultDesc: "Already processed" });
+    if (callback.ResultCode === 0)
+      await completeInvoicePayment(
+        db,
+        attempt.invoiceId,
+        callback.CheckoutRequestID,
+        callback,
+      );
+    else
+      await db
+        .update(invoicePaymentAttempts)
+        .set({ status: "failed", rawCallbackPayload: callback })
+        .where(eq(invoicePaymentAttempts.id, attempt.id));
     return c.json({ ResultCode: 0, ResultDesc: "Accepted" });
   },
 );
@@ -1117,14 +1330,28 @@ app.post(
     const [invoiceAttempt] = await db
       .select()
       .from(invoicePaymentAttempts)
-      .where(eq(invoicePaymentAttempts.providerReference, callback.CheckoutRequestID))
+      .where(
+        eq(
+          invoicePaymentAttempts.providerReference,
+          callback.CheckoutRequestID,
+        ),
+      )
       .limit(1);
     if (invoiceAttempt) {
-      if (invoiceAttempt.status !== "initiated") return c.json({ ResultCode: 0, ResultDesc: "Already processed" });
+      if (invoiceAttempt.status !== "initiated")
+        return c.json({ ResultCode: 0, ResultDesc: "Already processed" });
       if (callback.ResultCode === 0) {
-        await completeInvoicePayment(db, invoiceAttempt.invoiceId, callback.CheckoutRequestID, callback);
+        await completeInvoicePayment(
+          db,
+          invoiceAttempt.invoiceId,
+          callback.CheckoutRequestID,
+          callback,
+        );
       } else {
-        await db.update(invoicePaymentAttempts).set({ status: "failed", rawCallbackPayload: callback }).where(eq(invoicePaymentAttempts.id, invoiceAttempt.id));
+        await db
+          .update(invoicePaymentAttempts)
+          .set({ status: "failed", rawCallbackPayload: callback })
+          .where(eq(invoicePaymentAttempts.id, invoiceAttempt.id));
       }
       return c.json({ ResultCode: 0, ResultDesc: "Accepted" });
     }
@@ -1189,14 +1416,12 @@ app.post(
             updatedAt: new Date(),
           })
           .where(eq(orders.id, order.id));
-        await db
-          .insert(orderStatusHistory)
-          .values({
-            storeId: order.storeId,
-            orderId: order.id,
-            status: "paid",
-            note: "M-Pesa payment confirmed",
-          });
+        await db.insert(orderStatusHistory).values({
+          storeId: order.storeId,
+          orderId: order.id,
+          status: "paid",
+          note: "M-Pesa payment confirmed",
+        });
       }
     }
     return c.json({
@@ -1235,27 +1460,55 @@ app.post(
     const [invoice] = await db
       .select()
       .from(invoices)
-      .where(and(eq(invoices.id, input.invoiceId), eq(invoices.storeId, c.get("user").storeId)))
+      .where(
+        and(
+          eq(invoices.id, input.invoiceId),
+          eq(invoices.storeId, c.get("user").storeId),
+        ),
+      )
       .limit(1);
-    if (!invoice || invoice.status === "paid" || invoice.status === "cancelled") return c.json({ error: "Invoice is not payable" }, 409);
+    if (!invoice || invoice.status === "paid" || invoice.status === "cancelled")
+      return c.json({ error: "Invoice is not payable" }, 409);
     const [config] = await db
       .select()
       .from(platformPaymentConfig)
-      .where(and(eq(platformPaymentConfig.provider, "mpesa"), eq(platformPaymentConfig.isActive, true)))
+      .where(
+        and(
+          eq(platformPaymentConfig.provider, "mpesa"),
+          eq(platformPaymentConfig.isActive, true),
+        ),
+      )
       .limit(1);
-    if (!config) return c.json({ error: "Platform M-Pesa is not configured" }, 409);
+    if (!config)
+      return c.json({ error: "Platform M-Pesa is not configured" }, 409);
     const response = await initiateMpesa(
-      await decryptMpesaConfig(config.credentialsEncrypted, c.env.PAYMENT_CREDENTIALS_KEY, config.environment),
+      await decryptMpesaConfig(
+        config.credentialsEncrypted,
+        c.env.PAYMENT_CREDENTIALS_KEY,
+        config.environment,
+      ),
       {
         amount: invoice.amount,
         customerPhone: input.customerPhone,
-        callbackUrl: new URL("/api/v1/payments/mpesa/callback", c.req.url).toString(),
+        callbackUrl: new URL(
+          "/api/v1/payments/mpesa/callback",
+          c.req.url,
+        ).toString(),
       },
     );
     const [attempt] = await db
       .insert(invoicePaymentAttempts)
-      .values({ invoiceId: invoice.id, provider: "mpesa", providerReference: response.CheckoutRequestID, status: "initiated" })
-      .returning({ id: invoicePaymentAttempts.id, providerReference: invoicePaymentAttempts.providerReference, status: invoicePaymentAttempts.status });
+      .values({
+        invoiceId: invoice.id,
+        provider: "mpesa",
+        providerReference: response.CheckoutRequestID,
+        status: "initiated",
+      })
+      .returning({
+        id: invoicePaymentAttempts.id,
+        providerReference: invoicePaymentAttempts.providerReference,
+        status: invoicePaymentAttempts.status,
+      });
     return c.json({ attempt, customerMessage: response.CustomerMessage });
   },
 );
@@ -1314,16 +1567,13 @@ app.post(
       .returning();
     if (!profile)
       return c.json({ error: "Printer profile could not be created" }, 500);
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "printer_profile.created",
-        entityType: "printer_profile",
-        entityId: profile.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "printer_profile.created",
+      entityType: "printer_profile",
+      entityId: profile.id,
+    });
     return c.json({ printerProfile: profile }, 201);
   },
 );
@@ -1347,16 +1597,13 @@ app.patch(
       )
       .returning();
     if (!profile) return c.json({ error: "Printer profile not found" }, 404);
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "printer_profile.updated",
-        entityType: "printer_profile",
-        entityId: profile.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "printer_profile.updated",
+      entityType: "printer_profile",
+      entityId: profile.id,
+    });
     return c.json({ printerProfile: profile });
   },
 );
@@ -1377,16 +1624,13 @@ app.delete(
       )
       .returning({ id: printerProfiles.id });
     if (!profile) return c.json({ error: "Printer profile not found" }, 404);
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "printer_profile.deleted",
-        entityType: "printer_profile",
-        entityId: profile.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "printer_profile.deleted",
+      entityType: "printer_profile",
+      entityId: profile.id,
+    });
     return c.body(null, 204);
   },
 );
@@ -1666,28 +1910,22 @@ app.post(
             updatedAt: new Date(),
           })
           .where(eq(orders.id, order.id));
-        await c
-          .get("db")
-          .insert(orderStatusHistory)
-          .values({
-            storeId: order.storeId,
-            orderId: order.id,
-            status: "paid",
-            changedByUserId: user.id,
-            note: "Bank transfer manually confirmed",
-          });
+        await c.get("db").insert(orderStatusHistory).values({
+          storeId: order.storeId,
+          orderId: order.id,
+          status: "paid",
+          changedByUserId: user.id,
+          note: "Bank transfer manually confirmed",
+        });
       }
     }
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "payment.bank_confirmed",
-        entityType: "payment_transaction",
-        entityId: transaction.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "payment.bank_confirmed",
+      entityType: "payment_transaction",
+      entityId: transaction.id,
+    });
     return c.json({ transaction: updated });
   },
 );
@@ -1864,16 +2102,13 @@ app.post(
       });
     if (!created)
       return c.json({ error: "Staff member could not be created" }, 500);
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "user.created",
-        entityType: "user",
-        entityId: created.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "user.created",
+      entityType: "user",
+      entityId: created.id,
+    });
     return c.json({ user: created }, 201);
   },
 );
@@ -1922,16 +2157,13 @@ app.patch(
         role: users.role,
         isActive: users.isActive,
       });
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "user.updated",
-        entityType: "user",
-        entityId: target.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "user.updated",
+      entityType: "user",
+      entityId: target.id,
+    });
     return c.json({ user: updated });
   },
 );
@@ -2036,16 +2268,13 @@ app.post(
             productId,
           })),
         );
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "promotion.created",
-        entityType: "promotion",
-        entityId: promotion.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "promotion.created",
+      entityType: "promotion",
+      entityId: promotion.id,
+    });
     return c.json({ promotion }, 201);
   },
 );
@@ -2132,16 +2361,13 @@ app.patch(
             })),
           );
     }
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "promotion.updated",
-        entityType: "promotion",
-        entityId: existing.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "promotion.updated",
+      entityType: "promotion",
+      entityId: existing.id,
+    });
     return c.json({ promotion: updated });
   },
 );
@@ -2162,16 +2388,13 @@ app.delete(
       )
       .returning({ id: promotions.id });
     if (!deleted) return c.json({ error: "Promotion not found" }, 404);
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "promotion.deleted",
-        entityType: "promotion",
-        entityId: deleted.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "promotion.deleted",
+      entityType: "promotion",
+      entityId: deleted.id,
+    });
     return c.body(null, 204);
   },
 );
@@ -2203,16 +2426,13 @@ app.post(
       .returning();
     if (!supplier)
       return c.json({ error: "Supplier could not be created" }, 500);
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "supplier.created",
-        entityType: "supplier",
-        entityId: supplier.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "supplier.created",
+      entityType: "supplier",
+      entityId: supplier.id,
+    });
     return c.json({ supplier }, 201);
   },
 );
@@ -2235,16 +2455,13 @@ app.patch(
       )
       .returning();
     if (!supplier) return c.json({ error: "Supplier not found" }, 404);
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "supplier.updated",
-        entityType: "supplier",
-        entityId: supplier.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "supplier.updated",
+      entityType: "supplier",
+      entityId: supplier.id,
+    });
     return c.json({ supplier });
   },
 );
@@ -2336,16 +2553,13 @@ app.post(
           unitCost: item.unitCost,
         })),
       );
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "purchase_order.created",
-        entityType: "purchase_order",
-        entityId: purchaseOrder.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "purchase_order.created",
+      entityType: "purchase_order",
+      entityId: purchaseOrder.id,
+    });
     return c.json({ purchaseOrder }, 201);
   },
 );
@@ -2401,16 +2615,13 @@ app.patch(
           })),
         );
     }
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "purchase_order.updated",
-        entityType: "purchase_order",
-        entityId: purchaseOrder.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "purchase_order.updated",
+      entityType: "purchase_order",
+      entityId: purchaseOrder.id,
+    });
     return c.json({ purchaseOrder: updated });
   },
 );
@@ -2543,16 +2754,13 @@ app.post(
       .returning();
     if (!account)
       return c.json({ error: "Customer account could not be created" }, 500);
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "customer_account.created",
-        entityType: "customer_account",
-        entityId: account.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "customer_account.created",
+      entityType: "customer_account",
+      entityId: account.id,
+    });
     return c.json({ customerAccount: account }, 201);
   },
 );
@@ -2575,16 +2783,13 @@ app.patch(
       )
       .returning();
     if (!account) return c.json({ error: "Customer account not found" }, 404);
-    await c
-      .get("db")
-      .insert(auditLogs)
-      .values({
-        storeId: user.storeId,
-        userId: user.id,
-        action: "customer_account.updated",
-        entityType: "customer_account",
-        entityId: account.id,
-      });
+    await c.get("db").insert(auditLogs).values({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "customer_account.updated",
+      entityType: "customer_account",
+      entityId: account.id,
+    });
     return c.json({ customerAccount: account });
   },
 );
@@ -2654,16 +2859,13 @@ app.post(
         ),
       )
       .returning();
-    await c
-      .get("db")
-      .insert(customerAccountTransactions)
-      .values({
-        storeId: user.storeId,
-        customerAccountId: account.id,
-        type: "payment",
-        amount: input.amount,
-        note: input.note,
-      });
+    await c.get("db").insert(customerAccountTransactions).values({
+      storeId: user.storeId,
+      customerAccountId: account.id,
+      type: "payment",
+      amount: input.amount,
+      note: input.note,
+    });
     await c
       .get("db")
       .insert(auditLogs)
@@ -3199,15 +3401,28 @@ app.get(
 const requestSaleAction =
   (actionType: "void" | "refund") => async (c: Context<AppEnv>) => {
     const user = c.get("user");
-    const input = (await c.req.json().catch(() => ({}))) as { deviceActionId?: string };
-    if (!input.deviceActionId) return c.json({ error: "deviceActionId is required" }, 400);
+    const input = (await c.req.json().catch(() => ({}))) as {
+      deviceActionId?: string;
+    };
+    if (!input.deviceActionId)
+      return c.json({ error: "deviceActionId is required" }, 400);
     const [processed] = await c
       .get("db")
       .select({ id: pendingApprovals.id, status: pendingApprovals.status })
       .from(pendingApprovals)
-      .where(and(eq(pendingApprovals.storeId, user.storeId), eq(pendingApprovals.deviceActionId, input.deviceActionId)))
+      .where(
+        and(
+          eq(pendingApprovals.storeId, user.storeId),
+          eq(pendingApprovals.deviceActionId, input.deviceActionId),
+        ),
+      )
       .limit(1);
-    if (processed) return c.json({ status: "already_processed", approvalId: processed.id, approvalStatus: processed.status });
+    if (processed)
+      return c.json({
+        status: "already_processed",
+        approvalId: processed.id,
+        approvalStatus: processed.status,
+      });
     const saleId = c.req.param("id");
     if (!saleId) return c.json({ error: "Sale ID is required" }, 400);
     const [sale] = await c
@@ -3244,17 +3459,20 @@ const requestSaleAction =
       .set({ status: actionType === "void" ? "voided" : "refunded" })
       .where(and(eq(sales.id, sale.id), eq(sales.storeId, user.storeId)))
       .returning();
-    await c.get("db").insert(pendingApprovals).values({
-      storeId: user.storeId,
-      requestedByUserId: user.id,
-      actionType,
-      targetSaleId: sale.id,
-      reason: `${actionType} completed by supervisor`,
-      deviceActionId: input.deviceActionId,
-      status: "approved",
-      approvedByUserId: user.id,
-      resolvedAt: new Date(),
-    });
+    await c
+      .get("db")
+      .insert(pendingApprovals)
+      .values({
+        storeId: user.storeId,
+        requestedByUserId: user.id,
+        actionType,
+        targetSaleId: sale.id,
+        reason: `${actionType} completed by supervisor`,
+        deviceActionId: input.deviceActionId,
+        status: "approved",
+        approvedByUserId: user.id,
+        resolvedAt: new Date(),
+      });
     await c
       .get("db")
       .insert(auditLogs)
@@ -3581,11 +3799,18 @@ app.get(
 const listAuditLogs = async (
   db: ReturnType<typeof createDb>,
   storeId: string,
-  query: { action?: string | undefined; from?: string | undefined; to?: string | undefined; page: number; pageSize: number },
+  query: {
+    action?: string | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
+    page: number;
+    pageSize: number;
+  },
 ) => {
   const conditions = [eq(auditLogs.storeId, storeId)];
   if (query.action) conditions.push(eq(auditLogs.action, query.action));
-  if (query.from) conditions.push(gte(auditLogs.createdAt, new Date(query.from)));
+  if (query.from)
+    conditions.push(gte(auditLogs.createdAt, new Date(query.from)));
   if (query.to) conditions.push(lt(auditLogs.createdAt, new Date(query.to)));
 
   return db
@@ -3628,7 +3853,10 @@ app.get(
   },
 );
 
-export const scheduled = async (_controller: unknown, env: AppEnv["Bindings"]) => {
+export const scheduled = async (
+  _controller: unknown,
+  env: AppEnv["Bindings"],
+) => {
   const db = createDb(env.DATABASE_URL);
   await generateInvoices(db);
   await markOverdueInvoices(db);
