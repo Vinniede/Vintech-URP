@@ -2,6 +2,54 @@ import { and, desc, eq, lte, lt } from "drizzle-orm";
 import { invoicePaymentAttempts, invoices, planPricing, stores } from "@urp/db/schema";
 import type { Database } from "./db.js";
 
+export const initializeBillingForStore = async (
+  db: Database,
+  storeId: string,
+  plan: string,
+  billingCycle: string,
+  currency: string,
+  now = new Date(),
+) => {
+  // Find pricing for this plan/cycle combo
+  const [pricing] = await db
+    .select()
+    .from(planPricing)
+    .where(and(
+      eq(planPricing.plan, plan as any),
+      eq(planPricing.billingCycle, billingCycle as any),
+      eq(planPricing.isActive, true),
+      lte(planPricing.effectiveFrom, now),
+    ))
+    .orderBy(desc(planPricing.effectiveFrom))
+    .limit(1);
+
+  if (!pricing) {
+    throw new Error(`No active pricing found for ${plan} ${billingCycle}`);
+  }
+
+  // Create first invoice
+  const periodStart = now;
+  const periodEnd = new Date(periodStart);
+  if (billingCycle === "annual") periodEnd.setUTCFullYear(periodEnd.getUTCFullYear() + 1);
+  else periodEnd.setUTCMonth(periodEnd.getUTCMonth() + 1);
+
+  const dueDate = new Date(periodEnd);
+  dueDate.setUTCDate(dueDate.getUTCDate() + 7);
+
+  const [invoice] = await db.insert(invoices).values({
+    storeId,
+    plan: plan as any,
+    billingCycle: billingCycle as any,
+    amount: pricing.amount,
+    currency,
+    periodStart,
+    periodEnd,
+    dueDate,
+  }).returning();
+
+  return invoice;
+};
+
 export const completeInvoicePayment = async (
   db: Database,
   invoiceId: string,

@@ -117,6 +117,7 @@ import {
   completeInvoicePayment,
   generateInvoices,
   markOverdueInvoices,
+  initializeBillingForStore,
 } from "./billing.js";
 import {
   moduleToggleSchema,
@@ -343,6 +344,39 @@ app.post("/api/v1/platform/invoices/:id/mark-paid", async (c) => {
     : c.json({ error: "Invoice not found" }, 404);
 });
 
+app.post("/api/v1/platform/stores/:id/generate-invoice", async (c) => {
+  const db = createDb(c.env.DATABASE_URL);
+  const storeId = c.req.param("id");
+  
+  // Get the store
+  const [store] = await db
+    .select()
+    .from(stores)
+    .where(eq(stores.id, storeId))
+    .limit(1);
+  
+  if (!store) return c.json({ error: "Store not found" }, 404);
+  
+  // Generate invoice for this specific store
+  try {
+    const invoice = await initializeBillingForStore(
+      db,
+      storeId,
+      store.billingPlan,
+      store.billingCycle,
+      store.currency,
+    );
+    return invoice
+      ? c.json({ invoice }, 201)
+      : c.json({ error: "Invoice could not be created" }, 500);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Invoice generation failed" },
+      400,
+    );
+  }
+});
+
 app.post("/api/v1/platform/billing/mark-overdue", async (c) => {
   const count = await markOverdueInvoices(createDb(c.env.DATABASE_URL));
   return c.json({ markedOverdue: count });
@@ -353,11 +387,48 @@ app.post("/api/v1/platform/billing/generate", async (c) => {
   return c.json({ generated: count });
 });
 
+app.post("/api/v1/platform/backfill-invoices", async (c) => {
+  const db = createDb(c.env.DATABASE_URL);
+  
+  // Find all stores that don't have any invoices yet
+  const storesWithoutInvoices = await db
+    .select({ 
+      id: stores.id, 
+      billingPlan: stores.billingPlan, 
+      billingCycle: stores.billingCycle, 
+      currency: stores.currency 
+    })
+    .from(stores)
+    .where(
+      sql`${stores.id} NOT IN (SELECT DISTINCT store_id FROM ${invoices})`
+    );
+  
+  let backfilled = 0;
+  const errors: string[] = [];
+  
+  for (const store of storesWithoutInvoices) {
+    try {
+      await initializeBillingForStore(
+        db,
+        store.id,
+        store.billingPlan,
+        store.billingCycle,
+        store.currency,
+      );
+      backfilled += 1;
+    } catch (error) {
+      errors.push(`Store ${store.id}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  
+  return c.json({ backfilled, errors, message: `Backfilled ${backfilled} stores with initial invoices` });
+});
+
 app.post(
   "/api/v1/platform/stores",
   zValidator("json", storeCreateSchema),
   async (c) => {
-    const { ownerName, ownerEmail, ownerPhone, ownerPassword, ...storeInput } =
+    const { ownerName, ownerEmail, ownerPhone, ownerPassword, billingPlan, billingCycle, ...storeInput } =
       c.req.valid("json");
     const db = createDb(c.env.DATABASE_URL);
     const [existing] = await db
@@ -370,7 +441,7 @@ app.post(
     try {
       [store] = await db
         .insert(stores)
-        .values(storeInput)
+        .values({ ...storeInput, billingPlan, billingCycle })
         .returning({
           id: stores.id,
           name: stores.name,
@@ -384,6 +455,20 @@ app.post(
       return c.json({ error: "Store slug already exists" }, 409);
     }
     if (!store) return c.json({ error: "Store could not be created" }, 500);
+    
+    // Initialize billing: create first invoice
+    try {
+      await initializeBillingForStore(db, store.id, billingPlan, billingCycle, storeInput.currency);
+    } catch (error) {
+      await db.delete(stores).where(eq(stores.id, store.id));
+      return c.json(
+        {
+          error: `Billing initialization failed: ${error instanceof Error ? error.message : "Unknown error"}. Ensure pricing is configured for the selected plan and cycle.`,
+        },
+        400,
+      );
+    }
+    
     let owner;
     try {
       [owner] = await db

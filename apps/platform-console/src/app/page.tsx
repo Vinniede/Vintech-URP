@@ -391,6 +391,32 @@ export default function PlatformHome() {
                 ))}
               </select>
             </label>
+            <p className="eyebrow owner-fields-label">BILLING PLAN</p>
+            <label>
+              Plan
+              <select
+                className="platform-select"
+                name="billingPlan"
+                defaultValue="pos_only"
+                required
+              >
+                <option value="pos_only">POS only</option>
+                <option value="storefront_only">Storefront only</option>
+                <option value="bundled">Bundled (POS + Storefront)</option>
+              </select>
+            </label>
+            <label>
+              Billing cycle
+              <select
+                className="platform-select"
+                name="billingCycle"
+                defaultValue="monthly"
+                required
+              >
+                <option value="monthly">Monthly</option>
+                <option value="annual">Annual</option>
+              </select>
+            </label>
             <p className="eyebrow owner-fields-label">OWNER LOGIN</p>
             <label>
               Owner name

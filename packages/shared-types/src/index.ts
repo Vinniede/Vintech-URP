@@ -73,6 +73,8 @@ export const storeCreateSchema = z.object({
   timezone: z.string().trim().min(1).max(80).default('UTC'),
   posEnabled: z.boolean().default(false),
   storefrontEnabled: z.boolean().default(false),
+  billingPlan: z.enum(['pos_only', 'storefront_only', 'bundled']).default('pos_only'),
+  billingCycle: z.enum(['monthly', 'annual']).default('monthly'),
   ownerName: z.string().trim().min(1).max(160),
   ownerEmail: z.string().email(),
   ownerPhone: z.string().trim().max(40).optional(),
