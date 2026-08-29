@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 type Product = { id: string; name: string; sku: string; description: string | null; sellingPrice: string; stockQuantity: string };
 type CartLine = { product: Product; quantity: number };
-const api = (path: string) => `${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1${path}`;
+const api = (path: string) => `${process.env.NEXT_PUBLIC_API_URL ?? 'https://unified-retail-api.vintech-urp.workers.dev'}/api/v1${path}`;
 const storeSlug = process.env.NEXT_PUBLIC_STORE_SLUG ?? 'demo';
 
 export function Storefront() {

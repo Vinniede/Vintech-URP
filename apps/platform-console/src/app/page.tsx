@@ -19,7 +19,7 @@ type Store = {
 };
 type Session = { accessToken: string; name: string; email: string };
 const api = (path: string) =>
-  `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787"}/api/v1/platform${path}`;
+  `${process.env.NEXT_PUBLIC_API_URL ?? "https://unified-retail-api.vintech-urp.workers.dev"}/api/v1/platform${path}`;
 const currencies = [
   ["KES", "Kenyan shilling"],
   ["NGN", "Nigerian naira"],

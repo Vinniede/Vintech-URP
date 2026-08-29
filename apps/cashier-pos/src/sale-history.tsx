@@ -5,7 +5,7 @@ import { posDb, type Session } from './db';
 
 type Sale = { id: string; deviceSaleId: string; cashierId: string; totalAmount: string; paymentMethod: string; status: 'completed' | 'voided' | 'refunded'; createdAt: string };
 type Detail = Sale & { items: Array<{ id: string; productId: string; quantity: string; unitPrice: string; discountAmount: string }> };
-const api = (path: string) => `${import.meta.env.VITE_API_URL ?? ''}/api/v1${path}`;
+const api = (path: string) => `${import.meta.env.VITE_API_URL ?? 'https://unified-retail-api.vintech-urp.workers.dev'}/api/v1${path}`;
 
 export function SaleHistory({ session, shiftId, online, onNotice }: { session: Session; shiftId?: string; online: boolean; onNotice: (message: string) => void }) {
   const [sales, setSales] = useState<Sale[]>([]);

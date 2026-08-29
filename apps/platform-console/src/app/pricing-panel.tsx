@@ -5,7 +5,7 @@ import { Alert, Button, Card, Input, Table } from '@urp/ui';
 
 type Pricing = { id: string; plan: string; billingCycle: string; amount: string; currency: string; isActive: boolean; effectiveFrom: string };
 type Session = { accessToken: string };
-const api = (path: string) => `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8787'}/api/v1/platform${path}`;
+const api = (path: string) => `${process.env.NEXT_PUBLIC_API_URL ?? 'https://unified-retail-api.vintech-urp.workers.dev'}/api/v1/platform${path}`;
 
 export function PricingPanel({ session }: { session: Session }) {
   const [pricing, setPricing] = useState<Pricing[]>([]);

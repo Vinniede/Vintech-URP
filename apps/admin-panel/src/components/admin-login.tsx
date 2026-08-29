@@ -11,7 +11,7 @@ type Session = {
   timezone?: string;
 };
 const api = (path: string) =>
-  `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1${path}`;
+  `${process.env.NEXT_PUBLIC_API_URL ?? "https://unified-retail-api.vintech-urp.workers.dev"}/api/v1${path}`;
 
 export function AdminLogin({
   onLogin,

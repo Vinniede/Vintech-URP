@@ -5,7 +5,7 @@ import { Alert, Button, Card, Table } from '@urp/ui';
 
 type Config = { provider: string; environment: string; isActive: boolean; configured: boolean };
 type Session = { accessToken: string };
-const api = (path: string) => `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8787'}/api/v1/platform${path}`;
+const api = (path: string) => `${process.env.NEXT_PUBLIC_API_URL ?? 'https://unified-retail-api.vintech-urp.workers.dev'}/api/v1/platform${path}`;
 
 export function PaymentConfigPanel({ session }: { session: Session }) {
   const [configs, setConfigs] = useState<Config[]>([]);

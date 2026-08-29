@@ -8,7 +8,7 @@ import { merchantThemeStyle } from '../theme';
 type Product = { id: string; name: string; sku: string; description: string | null; sellingPrice: string; stockQuantity: string };
 type Line = { product: Product; quantity: number };
 type Customer = { id: string; name: string; email: string; storeId: string; accessToken: string; refreshToken: string };
-const api = (path: string) => `${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1${path}`;
+const api = (path: string) => `${process.env.NEXT_PUBLIC_API_URL ?? 'https://unified-retail-api.vintech-urp.workers.dev'}/api/v1${path}`;
 
 export function StorefrontV2({ storeSlug }: { storeSlug: string }) {
   const [products, setProducts] = useState<Product[]>([]);

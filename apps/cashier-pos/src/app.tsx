@@ -23,7 +23,7 @@ import { parseQuantityInput } from "./cart-utils";
 import { useCameraScan, useKeyboardWedgeScan } from "@urp/scanning";
 
 const apiUrl = (path: string) =>
-  `${import.meta.env.VITE_API_URL ?? ""}/api/v1${path}`;
+  `${import.meta.env.VITE_API_URL ?? "https://unified-retail-api.vintech-urp.workers.dev"}/api/v1${path}`;
 
 type CartLine = { product: CachedProduct; quantity: number };
 type CustomerAccount = {

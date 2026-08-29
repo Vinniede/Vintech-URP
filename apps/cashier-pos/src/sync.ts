@@ -8,7 +8,7 @@ import {
 import type { SyncResultStatus } from "@urp/shared-types";
 
 const apiUrl = (path: string) =>
-  `${import.meta.env.VITE_API_URL ?? ""}/api/v1${path}`;
+  `${import.meta.env.VITE_API_URL ?? "https://unified-retail-api.vintech-urp.workers.dev"}/api/v1${path}`;
 
 export const syncPendingSales = async (session: Session) => {
   if (!navigator.onLine) return { synced: 0, approvalIds: [] as string[] };
