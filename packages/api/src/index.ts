@@ -596,7 +596,7 @@ app.post(
       )
       .limit(1);
     const [staffStore] = await db
-      .select({ isSuspended: stores.isSuspended })
+      .select({ isSuspended: stores.isSuspended, timezone: stores.timezone })
       .from(stores)
       .where(eq(stores.id, input.storeId))
       .limit(1);
@@ -626,6 +626,7 @@ app.post(
         name: user.name,
         role: user.role,
         storeId: user.storeId,
+        timezone: staffStore?.timezone ?? "UTC",
       },
     });
   },

@@ -8,6 +8,7 @@ type Session = {
   storeId: string;
   role: "owner" | "store_admin" | "inventory_clerk" | "fulfillment";
   name: string;
+  timezone?: string;
 };
 const api = (path: string) =>
   `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1${path}`;

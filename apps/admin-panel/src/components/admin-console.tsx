@@ -50,6 +50,7 @@ type Session = {
   storeId: string;
   role: Role;
   name: string;
+  timezone?: string;
 };
 
 const api = (path: string) =>
@@ -179,6 +180,23 @@ export function AdminConsole() {
           ] as const);
 
   if (!session) return <AdminLogin onLogin={setSession} />;
+
+  const timeZone = session.timezone ?? "UTC";
+  const currentHour = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    hour12: false,
+    timeZone,
+  }).format(new Date());
+  const hour = Number.parseInt(currentHour, 10);
+  const greeting =
+    Number.isNaN(hour)
+      ? `Good day, ${session.name.split(" ")[0]}.`
+      : hour < 12
+        ? `Good morning, ${session.name.split(" ")[0]}.`
+        : hour < 18
+          ? `Good afternoon, ${session.name.split(" ")[0]}.`
+          : `Good evening, ${session.name.split(" ")[0]}.`;
+
   return (
     <div className="admin-shell">
       <aside className="sidebar">
@@ -205,9 +223,7 @@ export function AdminConsole() {
               {session.role.replace("_", " ").toUpperCase()}
             </p>
             <h1>
-              {view === "dashboard"
-                ? `Good morning, ${session.name.split(" ")[0]}.`
-                : nav.find((item) => item.id === view)?.label}
+              {view === "dashboard" ? greeting : nav.find((item) => item.id === view)?.label}
             </h1>
           </div>
           <input
