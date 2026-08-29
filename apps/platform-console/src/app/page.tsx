@@ -70,6 +70,9 @@ export default function PlatformHome() {
   const [notice, setNotice] = useState("");
   const [invoiceStore, setInvoiceStore] = useState<Store | null>(null);
   const [deletingStoreId, setDeletingStoreId] = useState<string | null>(null);
+  const [regeneratingStoreId, setRegeneratingStoreId] = useState<string | null>(
+    null,
+  );
   const [metrics, setMetrics] = useState<{
     totalStores: number;
     activeStores: number;
@@ -182,6 +185,29 @@ export default function PlatformHome() {
     });
     if (!response.ok) return setNotice("Store update failed.");
     await load(session.accessToken);
+  };
+  const regenerateInvoice = async (store: Store) => {
+    setRegeneratingStoreId(store.id);
+    try {
+      const response = await fetch(api(`/stores/${store.id}/generate-invoice`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      });
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(body?.error ?? "Invoice could not be generated.");
+      }
+      setNotice(`Invoice regenerated for ${store.name}.`);
+      await load(session.accessToken);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Invoice could not be generated.",
+      );
+    } finally {
+      setRegeneratingStoreId(null);
+    }
   };
   const deleteStore = async (store: Store) => {
     if (
@@ -328,6 +354,15 @@ export default function PlatformHome() {
                       onClick={() => setInvoiceStore(store)}
                     >
                       Invoices
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={regeneratingStoreId === store.id}
+                      onClick={() => void regenerateInvoice(store)}
+                    >
+                      {regeneratingStoreId === store.id
+                        ? "Regenerating..."
+                        : "Regenerate invoice"}
                     </Button>
                     <Button
                       variant="danger"
